@@ -1,23 +1,57 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import DesktopDropZone from '@/components/DesktopDropZone.vue'
 import LoginPanel from '@/components/LoginPanel.vue'
-import Live2DCompanion from '@/components/Live2DCompanion.vue'
 import MobileCaptureButton from '@/components/MobileCaptureButton.vue'
+import PetDisplay from '@/components/PetDisplay.vue'
 import { useDeviceMode } from '@/composables/useDeviceMode'
 import { usePaletteStore } from '@/stores/palette'
+import { usePetStore } from '@/stores/pet'
 import { useSessionStore } from '@/stores/session'
+import { createDemoPet } from '@/utils/demoPet'
+import type { PetDisplayEvent } from '@/utils/live2d'
 
 const sessionStore = useSessionStore()
 const paletteStore = usePaletteStore()
+const petStore = usePetStore()
+const router = useRouter()
 const { isMobile } = useDeviceMode()
+const petEvent = ref<PetDisplayEvent>('idle')
 
 const pageStyle = computed(() => ({
   '--accent-color': paletteStore.accentColor,
 }))
 
-const handleImageSelected = (file: File) => {
+const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
+
+watch(
+  () => sessionStore.isLoggedIn,
+  async (isLoggedIn) => {
+    if (!isLoggedIn || petStore.petInfo) return
+    try {
+      await petStore.fetchProfile()
+    } catch (err) {
+      console.warn('[HomeView] Profile fetch failed, using demo pet.', err)
+    }
+  },
+  { immediate: true },
+)
+
+const handleImageSelected = async (file: File) => {
   paletteStore.addColorFromImageName(file.name)
+  petStore.updateEnergy({ r: 8, g: 6, b: 4, total: 12 })
+  petEvent.value = 'feeding'
+  await wait(520)
+  petEvent.value = 'success'
+  await wait(280)
+  await router.push({ name: 'result' })
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 }
 </script>
 
@@ -28,7 +62,7 @@ const handleImageSelected = (file: File) => {
 
     <section v-if="!sessionStore.isLoggedIn" class="login-layout">
       <LoginPanel />
-      <Live2DCompanion :accent-color="paletteStore.accentColor" />
+      <PetDisplay :pet="displayPet" size="panel" :interactive="false" />
     </section>
 
     <section v-else class="main-layout">
@@ -50,7 +84,7 @@ const handleImageSelected = (file: File) => {
           />
         </div>
 
-        <Live2DCompanion :accent-color="paletteStore.accentColor" mood="happy" />
+        <PetDisplay :pet="displayPet" :event="petEvent" />
 
         <DesktopDropZone v-if="!isMobile" @image-selected="handleImageSelected" />
         <div v-else class="mobile-action">
@@ -187,7 +221,7 @@ const handleImageSelected = (file: File) => {
     padding: 28px 0;
   }
 
-  .login-layout :deep(.companion) {
+  .login-layout :deep(.pet-display) {
     order: -1;
     justify-self: center;
   }

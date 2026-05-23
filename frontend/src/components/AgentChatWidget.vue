@@ -702,10 +702,30 @@ watch(messages, persistMessages, { deep: true })
     left: 12px;
   }
 
+  .agent-chat:not(.agent-chat--open) {
+    left: auto;
+  }
+
   .agent-chat__launcher {
     width: 100%;
     max-width: 260px;
     margin-left: auto;
+  }
+
+  .agent-chat:not(.agent-chat--open) .agent-chat__launcher {
+    width: 58px;
+    min-height: 58px;
+    justify-content: center;
+    padding: 7px;
+  }
+
+  .agent-chat:not(.agent-chat--open) .agent-chat__launcher-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   .agent-chat__panel {
