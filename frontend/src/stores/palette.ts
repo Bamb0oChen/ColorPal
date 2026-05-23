@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { findClosestColor, type ColorItem } from '@/utils/constants'
 
 const STORAGE_KEY = 'colorpal.palette'
 const DEFAULT_COLORS = ['#ff6b6b', '#4ecdc4', '#ffe66d']
@@ -8,6 +9,17 @@ export const usePaletteStore = defineStore('palette', () => {
   const collectedColors = ref<string[]>(loadColors())
 
   const accentColor = computed(() => collectedColors.value[0] || DEFAULT_COLORS[0])
+  const collectedColorItems = computed(() => {
+    const seen = new Set<string>()
+
+    return collectedColors.value
+      .map((color) => findClosestColor(color))
+      .filter((color): color is ColorItem => {
+        if (!color || seen.has(color.id)) return false
+        seen.add(color.id)
+        return true
+      })
+  })
 
   const addColorFromImageName = (fileName: string) => {
     const next = colorFromText(fileName)
@@ -15,7 +27,7 @@ export const usePaletteStore = defineStore('palette', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedColors.value))
   }
 
-  return { collectedColors, accentColor, addColorFromImageName }
+  return { collectedColors, collectedColorItems, accentColor, addColorFromImageName }
 })
 
 function loadColors(): string[] {

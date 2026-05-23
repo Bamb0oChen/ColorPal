@@ -6,6 +6,7 @@ import LoginPanel from '@/components/LoginPanel.vue'
 import MobileCaptureButton from '@/components/MobileCaptureButton.vue'
 import PetDisplay from '@/components/PetDisplay.vue'
 import { useDeviceMode } from '@/composables/useDeviceMode'
+import { ALL_COLORS } from '@/utils/constants'
 import { usePaletteStore } from '@/stores/palette'
 import { usePetStore } from '@/stores/pet'
 import { useSessionStore } from '@/stores/session'
@@ -24,6 +25,10 @@ const pageStyle = computed(() => ({
 }))
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
+const collectedCount = computed(() => paletteStore.collectedColors.length)
+const progressPercent = computed(() =>
+  Math.round((collectedCount.value / ALL_COLORS.length) * 100),
+)
 
 watch(
   () => sessionStore.isLoggedIn,
@@ -56,25 +61,34 @@ function wait(ms: number) {
 </script>
 
 <template>
-  <main class="home-page" :style="pageStyle">
+  <section class="home-page" :style="pageStyle">
     <div class="wash wash-one" />
     <div class="wash wash-two" />
 
-    <section v-if="!sessionStore.isLoggedIn" class="login-layout">
+    <div v-if="!sessionStore.isLoggedIn" class="login-layout">
       <LoginPanel />
       <PetDisplay :pet="displayPet" size="panel" :interactive="false" />
-    </section>
+    </div>
 
-    <section v-else class="main-layout">
-      <header class="topbar">
-        <div>
-          <p class="brand">ColorPal</p>
-          <p class="welcome">Hi, {{ sessionStore.session?.display_name }}</p>
+    <div v-else class="main-layout">
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">ColorPal</p>
+          <h1>把现实里的颜色收进你的图鉴</h1>
+          <p class="summary">
+            当前已识别 {{ collectedCount }} / {{ ALL_COLORS.length }} 种标准颜色，页面主题会跟随最近收集的颜色变化。
+          </p>
+          <div class="progress-track" aria-label="收集进度">
+            <span :style="{ width: progressPercent + '%' }" />
+          </div>
         </div>
-        <button type="button" class="ghost-button" @click="sessionStore.logout">退出</button>
-      </header>
 
-      <div class="stage">
+        <div class="spirit-stage">
+          <PetDisplay :pet="displayPet" :event="petEvent" />
+        </div>
+      </section>
+
+      <section class="capture-panel">
         <div class="palette-strip" aria-label="已收集颜色">
           <span
             v-for="color in paletteStore.collectedColors"
@@ -84,15 +98,13 @@ function wait(ms: number) {
           />
         </div>
 
-        <PetDisplay :pet="displayPet" :event="petEvent" />
-
         <DesktopDropZone v-if="!isMobile" @image-selected="handleImageSelected" />
         <div v-else class="mobile-action">
           <MobileCaptureButton @image-selected="handleImageSelected" />
         </div>
-      </div>
-    </section>
-  </main>
+      </section>
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -147,54 +159,83 @@ function wait(ms: number) {
 
 .main-layout {
   display: grid;
-  grid-template-rows: auto 1fr;
-  padding: 26px;
-}
-
-.topbar {
-  display: flex;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  gap: 34px;
+  width: min(1080px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 108px 0 56px;
 }
 
-.brand,
-.welcome {
+.hero-panel,
+.capture-panel {
+  display: grid;
+  gap: 24px;
+}
+
+.hero-panel {
+  align-content: center;
+}
+
+.eyebrow,
+.summary,
+h1 {
   margin: 0;
 }
 
-.brand {
+.eyebrow {
   color: var(--accent-color);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
-.welcome {
-  margin-top: 4px;
-  color: #555;
+h1 {
+  margin-top: 12px;
+  max-width: 9em;
+  font-size: clamp(42px, 5vw, 68px);
+  line-height: 0.98;
+  letter-spacing: 0;
 }
 
-.ghost-button {
-  min-width: 72px;
-  height: 38px;
-  border: 1px solid rgba(30, 30, 30, 0.12);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.68);
-  color: #333;
-  cursor: pointer;
+.summary {
+  margin-top: 18px;
+  max-width: 460px;
+  color: #606060;
+  line-height: 1.7;
 }
 
-.stage {
-  min-height: calc(100vh - 120px);
+.progress-track {
+  width: min(360px, 100%);
+  height: 10px;
+  margin-top: 26px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(20, 20, 20, 0.08);
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-color);
+}
+
+.spirit-stage {
   display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 24px;
+  justify-items: start;
+}
+
+.capture-panel {
+  justify-items: center;
 }
 
 .palette-strip {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
+  max-width: 420px;
   padding: 8px;
   border: 1px solid rgba(20, 20, 20, 0.08);
   border-radius: 999px;
@@ -215,6 +256,10 @@ function wait(ms: number) {
 }
 
 @media (max-width: 760px) {
+  .home-page {
+    padding-bottom: 84px;
+  }
+
   .login-layout {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -227,12 +272,24 @@ function wait(ms: number) {
   }
 
   .main-layout {
-    padding: 18px;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    width: min(420px, calc(100vw - 32px));
+    padding: 30px 0 36px;
   }
 
-  .stage {
-    min-height: calc(100vh - 104px);
-    gap: 18px;
+  h1 {
+    max-width: 10em;
+    font-size: 38px;
+  }
+
+  .spirit-stage,
+  .capture-panel {
+    justify-items: center;
+  }
+
+  .hero-copy {
+    text-align: center;
   }
 }
 </style>

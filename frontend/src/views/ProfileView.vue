@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
 import PetDisplay from '@/components/PetDisplay.vue'
+import {
+  ALL_ACHIEVEMENTS,
+  ALL_COLORS,
+  AchievementCategoryColor,
+  AchievementCategoryLabel,
+  getGlobalProgress,
+} from '@/utils/constants'
 import { usePaletteStore } from '@/stores/palette'
 import { usePetStore } from '@/stores/pet'
 import { useSessionStore } from '@/stores/session'
@@ -12,21 +18,27 @@ const petStore = usePetStore()
 const sessionStore = useSessionStore()
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
-const energyPercent = computed(() =>
-  Math.min(
-    Math.round((displayPet.value.energy.current / displayPet.value.energy.max) * 100),
-    100,
-  ),
+const collectedIds = computed(() => paletteStore.collectedColors.map((color) => color))
+const progress = computed(() => getGlobalProgress(collectedIds.value))
+const progressPercent = computed(() => Math.round((progress.value.collected / progress.value.total) * 100))
+const stage = computed(() => {
+  if (progressPercent.value >= 75) return 3
+  if (progressPercent.value >= 40) return 2
+  if (progressPercent.value >= 15) return 1
+  return 0
+})
+
+const achievements = computed(() =>
+  ALL_ACHIEVEMENTS.map((achievement, index) => ({
+    ...achievement,
+    unlocked: index < Math.min(ALL_ACHIEVEMENTS.length, Math.floor(progress.value.collected / 2)),
+  })),
 )
-const channels = computed(() => [
-  { key: 'r', label: '红能量', color: '#ff6b6b', value: displayPet.value.energy.r },
-  { key: 'g', label: '绿能量', color: '#4ecdc4', value: displayPet.value.energy.g },
-  { key: 'b', label: '蓝能量', color: '#5b7cfa', value: displayPet.value.energy.b },
-])
+
+const unlockedCount = computed(() => achievements.value.filter((item) => item.unlocked).length)
 
 onMounted(async () => {
   if (!sessionStore.isLoggedIn || petStore.petInfo) return
-
   try {
     await petStore.fetchProfile()
   } catch (err) {
@@ -36,183 +48,282 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="profile-page" :style="{ '--accent-color': displayPet.color }">
-    <nav class="page-nav">
-      <RouterLink to="/">采集颜色</RouterLink>
-      <RouterLink to="/result">最近投喂</RouterLink>
-    </nav>
-
-    <section class="profile-layout">
-      <div class="profile-copy">
-        <p class="section-label">小彩状态</p>
-        <h1>{{ displayPet.name }}</h1>
-        <p class="mood-line">
-          第 {{ displayPet.stage + 1 }} 阶段 · {{ displayPet.mood }} · {{ energyPercent }}%
-        </p>
-
-        <div class="energy-meter" aria-label="总能量">
-          <span :style="{ width: `${energyPercent}%` }" />
-        </div>
-
-        <div class="channel-list">
-          <article v-for="channel in channels" :key="channel.key">
-            <div>
-              <strong>{{ channel.label }}</strong>
-              <span>{{ channel.value }}</span>
-            </div>
-            <i
-              :style="{
-                '--channel-color': channel.color,
-                width: `${Math.min(channel.value, displayPet.energy.max)}%`,
-              }"
-            />
-          </article>
-        </div>
+  <section class="profile-page">
+    <header class="profile-hero">
+      <div class="identity">
+        <p class="eyebrow">Profile</p>
+        <h1>{{ sessionStore.session?.display_name || 'ColorPal 用户' }}</h1>
+        <p>用颜色记录世界，养成你的专属色彩精灵。</p>
       </div>
 
       <PetDisplay :pet="displayPet" size="hero" event="idle" />
+    </header>
+
+    <section class="stats-grid" aria-label="个人统计">
+      <article>
+        <strong>{{ progress.collected }}</strong>
+        <span>已收集</span>
+      </article>
+      <article>
+        <strong>{{ progress.total }}</strong>
+        <span>目标色</span>
+      </article>
+      <article>
+        <strong>{{ unlockedCount }}</strong>
+        <span>成就</span>
+      </article>
+      <article>
+        <strong>{{ stage + 1 }}</strong>
+        <span>精灵阶段</span>
+      </article>
     </section>
-  </main>
+
+    <section class="progress-panel">
+      <div class="panel-header">
+        <h2>色彩进度</h2>
+        <span>{{ progressPercent }}%</span>
+      </div>
+      <div class="progress-track">
+        <span :style="{ width: progressPercent + '%' }" />
+      </div>
+      <div class="rarity-grid">
+        <div>
+          <strong>{{ progress.common.collected }}/{{ progress.common.total }}</strong>
+          <span>常见</span>
+        </div>
+        <div>
+          <strong>{{ progress.rare.collected }}/{{ progress.rare.total }}</strong>
+          <span>稀有</span>
+        </div>
+        <div>
+          <strong>{{ progress.epic.collected }}/{{ progress.epic.total }}</strong>
+          <span>史诗</span>
+        </div>
+        <div>
+          <strong>{{ progress.legendary.collected }}/{{ progress.legendary.total }}</strong>
+          <span>传说</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="achievement-panel">
+      <div class="panel-header">
+        <h2>成就</h2>
+        <span>{{ unlockedCount }}/{{ ALL_ACHIEVEMENTS.length }}</span>
+      </div>
+
+      <div class="achievement-list">
+        <article
+          v-for="item in achievements"
+          :key="item.id"
+          class="achievement-card"
+          :class="{ unlocked: item.unlocked }"
+        >
+          <span class="achievement-mark" :style="{ backgroundColor: AchievementCategoryColor[item.category] }" />
+          <div>
+            <strong>{{ item.name }}</strong>
+            <p>{{ item.description }}</p>
+          </div>
+          <small>{{ AchievementCategoryLabel[item.category] }}</small>
+        </article>
+      </div>
+    </section>
+  </section>
 </template>
 
 <style scoped>
 .profile-page {
   min-height: 100vh;
-  padding: 28px;
-  background:
-    radial-gradient(circle at 78% 20%, color-mix(in srgb, var(--accent-color), transparent 74%), transparent 26%),
-    linear-gradient(180deg, #ffffff, #f8f9fa);
-  color: #252525;
+  padding: 112px max(24px, calc((100vw - 1080px) / 2)) 72px;
+  background: #fbfbfa;
+  color: #202020;
 }
 
-.page-nav {
-  width: min(1080px, 100%);
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin: 0 auto 18px;
-}
-
-.page-nav a {
-  min-height: 38px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0 14px;
-  border: 1px solid rgba(30, 30, 30, 0.09);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.74);
-  color: #333;
-  font-size: 14px;
-  font-weight: 750;
-  text-decoration: none;
-}
-
-.profile-layout {
-  width: min(1080px, 100%);
-  min-height: calc(100vh - 102px);
+.profile-hero {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(280px, 0.92fr);
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 58px;
-  margin: 0 auto;
+  gap: 32px;
+  margin-bottom: 20px;
+  padding: 28px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
 }
 
-.profile-copy {
-  display: grid;
-  gap: 20px;
-}
-
-.section-label,
-.mood-line {
+.eyebrow,
+h1,
+h2,
+p {
   margin: 0;
 }
 
-.section-label {
-  color: var(--accent-color);
+.eyebrow {
+  color: var(--accent-color, #ff6b6b);
   font-size: 13px;
   font-weight: 850;
+  text-transform: uppercase;
 }
 
 h1 {
-  margin: 0;
-  font-size: clamp(44px, 7vw, 82px);
-  line-height: 0.96;
+  margin-top: 8px;
+  font-size: 42px;
   letter-spacing: 0;
 }
 
-.mood-line {
-  color: #69645e;
-  font-size: 17px;
-  font-weight: 720;
+.identity p {
+  margin-top: 12px;
+  color: #666;
+  line-height: 1.7;
 }
 
-.energy-meter {
-  height: 18px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: inset 0 0 0 1px rgba(35, 35, 35, 0.08);
-}
-
-.energy-meter span {
-  height: 100%;
-  display: block;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent-color), #4ecdc4, #ffe66d);
-}
-
-.channel-list {
+.stats-grid,
+.rarity-grid {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
-.channel-list article {
+.stats-grid article,
+.rarity-grid div {
   display: grid;
-  gap: 9px;
-  padding: 14px;
-  border: 1px solid rgba(31, 31, 31, 0.08);
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.74);
+  background: #fff;
 }
 
-.channel-list div {
+.stats-grid strong {
+  color: var(--accent-color, #ff6b6b);
+  font-size: 30px;
+}
+
+.stats-grid span,
+.rarity-grid span {
+  color: #777;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.progress-panel,
+.achievement-panel {
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.panel-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  margin-bottom: 16px;
 }
 
-.channel-list strong,
-.channel-list span {
-  font-size: 14px;
+.panel-header h2 {
+  font-size: 22px;
 }
 
-.channel-list i {
+.panel-header span {
+  color: var(--accent-color, #ff6b6b);
+  font-weight: 850;
+}
+
+.progress-track {
   height: 10px;
+  margin-bottom: 16px;
+  overflow: hidden;
   border-radius: 999px;
-  background: var(--channel-color);
+  background: rgba(20, 20, 20, 0.08);
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-color, #ff6b6b);
+}
+
+.achievement-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.achievement-card {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 84px;
+  padding: 14px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 8px;
+  background: rgba(250, 250, 250, 0.72);
+  opacity: 0.58;
+}
+
+.achievement-card.unlocked {
+  background: #fff;
+  opacity: 1;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+.achievement-mark {
+  width: 12px;
+  height: 48px;
+  border-radius: 999px;
+}
+
+.achievement-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.achievement-card p,
+.achievement-card small {
+  color: #777;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.achievement-card small {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 @media (max-width: 760px) {
   .profile-page {
-    padding: 18px;
+    padding: 30px 16px 106px;
   }
 
-  .page-nav {
-    justify-content: center;
-  }
-
-  .profile-layout {
-    min-height: auto;
+  .profile-hero {
     grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .profile-copy {
-    order: 2;
+    justify-items: center;
+    text-align: center;
+    padding: 24px 18px;
   }
 
   h1 {
-    font-size: 52px;
+    font-size: 34px;
+  }
+
+  .stats-grid,
+  .rarity-grid,
+  .achievement-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .achievement-card {
+    grid-template-columns: 10px 1fr;
+  }
+
+  .achievement-card small {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 </style>

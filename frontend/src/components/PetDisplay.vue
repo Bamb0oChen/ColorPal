@@ -21,6 +21,7 @@ const props = withDefaults(
     event?: PetDisplayEvent
     modelPath?: string
     showStats?: boolean
+    offsetY?: number
   }>(),
   {
     size: 'hero',
@@ -28,6 +29,7 @@ const props = withDefaults(
     event: 'idle',
     modelPath: defaultPetModel,
     showStats: true,
+    offsetY: 0.94,
   },
 )
 
@@ -101,6 +103,15 @@ watch(
   },
 )
 
+watch(
+  () => [props.size, props.showStats, props.pet],
+  () => {
+    if (loadState.value !== 'ready') return
+    nextTick(() => fitModel())
+  },
+  { deep: true },
+)
+
 async function mountLive2d() {
   if (!canvasHost.value) return
 
@@ -160,13 +171,13 @@ function fitModel() {
   app.value.renderer.resize(width, height)
   model.value.scale.set(1)
 
-  const scaleMultiplier = props.showStats ? 1.2 : 1.55
+  const scaleMultiplier = props.showStats ? 1.5 : 1.55
   const scale =
     Math.min((width * 0.84) / model.value.width, (height * 0.86) / model.value.height) *
     scaleMultiplier
   model.value.scale.set(scale)
   model.value.x = width / 2
-  model.value.y = height * (props.showStats ? 0.72 : 1.08)
+  model.value.y = height * (props.showStats ? props.offsetY : 1.08)
 }
 
 async function playEventMotion(event: PetDisplayEvent) {
@@ -294,13 +305,17 @@ async function loadCubism2Runtime() {
   position: relative;
   width: min(48vw, 360px);
   min-width: 220px;
-  aspect-ratio: 0.82;
+  aspect-ratio: 0.74;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   place-items: center;
   isolation: isolate;
   color: #282828;
   filter: drop-shadow(0 22px 34px color-mix(in srgb, var(--pet-accent), transparent 72%));
+}
+
+.pet-display.is-visual-only {
+  aspect-ratio: 0.86;
 }
 
 .pet-display.has-stats {
@@ -315,7 +330,6 @@ async function loadCubism2Runtime() {
 .pet-display.is-avatar {
   width: min(24vw, 168px);
   min-width: 132px;
-  aspect-ratio: 1;
   filter: drop-shadow(0 14px 22px color-mix(in srgb, var(--pet-accent), transparent 78%));
 }
 
@@ -325,7 +339,7 @@ async function loadCubism2Runtime() {
 }
 
 .pet-display.is-visual-only {
-  aspect-ratio: 1;
+  aspect-ratio: 0.86;
 }
 
 .aura {
@@ -382,7 +396,6 @@ async function loadCubism2Runtime() {
   min-height: 0;
   align-self: stretch;
   justify-self: stretch;
-  overflow: hidden;
 }
 
 .is-visual-only .aura {
