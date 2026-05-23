@@ -12,6 +12,9 @@ class Settings(BaseSettings):
         'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
     )
     vision_model: str = 'qwen-vl-max'
+    chat_api_key: str = ''
+    chat_api_base_url: str = ''
+    chat_model: str = ''
     database_url: str = 'sqlite:///./data/colorpal.db'
     cors_allow_origins: str = 'http://localhost:5173'
 
