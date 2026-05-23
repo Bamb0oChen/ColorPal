@@ -29,9 +29,9 @@ const stage = computed(() => {
 })
 
 const achievements = computed(() =>
-  ALL_ACHIEVEMENTS.map((achievement, index) => ({
+  ALL_ACHIEVEMENTS.map((achievement) => ({
     ...achievement,
-    unlocked: index < Math.min(ALL_ACHIEVEMENTS.length, Math.floor(progress.value.collected / 2)),
+    unlocked: devMode.value || (achievement.check?.(collectedIds.value) ?? false),
   })),
 )
 

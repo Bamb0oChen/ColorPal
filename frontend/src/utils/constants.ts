@@ -307,25 +307,111 @@ export function checkAchievements(collectedIds: string[]): Achievement[] {
   return ALL_ACHIEVEMENTS.filter((a) => a.check?.(collectedIds) && !a.check?.([]));
 }
 
-// 注：具体成就的 check 函数由后端实现，这里只定义结构
+// 收集类辅助函数
+function allInFamily(collectedIds: string[], family: ColorFamily): boolean {
+  const familyColors = ALL_COLORS.filter((c) => c.family === family)
+  return familyColors.every((c) => collectedIds.includes(c.id))
+}
+
+function countByRarity(collectedIds: string[], rarity: Rarity): number {
+  return ALL_COLORS.filter((c) => c.rarity === rarity && collectedIds.includes(c.id)).length
+}
+
 export const ALL_ACHIEVEMENTS: Achievement[] = [
-  // 收集类
-  { id: 'achieve_red_fever',        name: '红色狂热',   description: '集齐全部 6 种红色系颜色',   category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_orange_collector', name: '橙色收集家', description: '集齐全部 4 种橙色系颜色',   category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_yellow_hunter',   name: '黄色猎人',   description: '集齐全部 5 种黄色系颜色',   category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_green_guardian',  name: '绿色守护者', description: '集齐全部 6 种绿色系颜色',   category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_blue_dreamer',    name: '蓝色梦想家', description: '集齐全部 6 种蓝色系颜色',   category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_purple_mystery',  name: '紫色神秘',   description: '集齐全部 5 种紫色系颜色',   category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_gray_master',     name: '无彩大师',   description: '集齐全部 4 种无彩色/金属色', category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  { id: 'achieve_full_spectrum',   name: '全色谱大师', description: '集齐全部 36 种颜色',        category: AchievementCategory.COLLECT, color: '#6C5CE7' },
-  // 稀有度类
-  { id: 'achieve_novice',    name: '新手猎色',   description: '累计收集 18 种常见颜色', category: AchievementCategory.RARITY, color: '#FFD700' },
-  { id: 'achieve_rare_finder', name: '稀有发现者', description: '累计收集 11 种稀有颜色', category: AchievementCategory.RARITY, color: '#FFD700' },
-  { id: 'achieve_epic_hunter', name: '史诗猎手',  description: '累计收集 5 种史诗颜色',  category: AchievementCategory.RARITY, color: '#FFD700' },
-  { id: 'achieve_legend_eye',  name: '传说之眼',  description: '累计收集 2 种传说颜色',  category: AchievementCategory.RARITY, color: '#FFD700' },
-  // 特殊组合
-  { id: 'achieve_primary',    name: '三原色',   description: '集齐正红 + 明黄 + 天蓝',       category: AchievementCategory.COMBO, color: '#00B894' },
-  { id: 'achieve_rainbow',    name: '彩虹之路', description: '集齐红橙黄绿蓝靛紫 7 色',       category: AchievementCategory.COMBO, color: '#00B894' },
-  { id: 'achieve_warm_cool',  name: '冷暖对决', description: '同时拥有 5 种暖色 + 5 种冷色', category: AchievementCategory.COMBO, color: '#00B894' },
-  { id: 'achieve_black_white', name: '黑白之间', description: '集齐黑 + 白 + 银',            category: AchievementCategory.COMBO, color: '#00B894' },
+  // ---- 收集类 ----
+  {
+    id: 'achieve_red_fever', name: '红色狂热', description: '集齐全部 6 种红色系颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#FF0000',
+    check: (ids) => allInFamily(ids, ColorFamily.RED),
+  },
+  {
+    id: 'achieve_orange_collector', name: '橙色收集家', description: '集齐全部 4 种橙色系颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#FFA500',
+    check: (ids) => allInFamily(ids, ColorFamily.ORANGE),
+  },
+  {
+    id: 'achieve_yellow_hunter', name: '黄色猎人', description: '集齐全部 5 种黄色系颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#FFD700',
+    check: (ids) => allInFamily(ids, ColorFamily.YELLOW),
+  },
+  {
+    id: 'achieve_green_guardian', name: '绿色守护者', description: '集齐全部 6 种绿色系颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#7CFC00',
+    check: (ids) => allInFamily(ids, ColorFamily.GREEN),
+  },
+  {
+    id: 'achieve_blue_dreamer', name: '蓝色梦想家', description: '集齐全部 6 种蓝色系颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#87CEEB',
+    check: (ids) => allInFamily(ids, ColorFamily.BLUE),
+  },
+  {
+    id: 'achieve_purple_mystery', name: '紫色神秘', description: '集齐全部 5 种紫色系颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#8F00FF',
+    check: (ids) => allInFamily(ids, ColorFamily.PURPLE),
+  },
+  {
+    id: 'achieve_gray_master', name: '无彩大师', description: '集齐全部 4 种无彩色/金属色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: '#C0C0C0',
+    check: (ids) => allInFamily(ids, ColorFamily.GRAY),
+  },
+  {
+    id: 'achieve_full_spectrum', name: '全色谱大师', description: '集齐全部 36 种颜色',
+    category: AchievementCategory.COLLECT, color: '#6C5CE7', swatch: 'linear-gradient(90deg, #FF0000, #FFA500, #FFD700, #7CFC00, #87CEEB, #8F00FF)',
+    check: (ids) => ALL_COLORS.every((c) => ids.includes(c.id)),
+  },
+  // ---- 稀有度类 ----
+  {
+    id: 'achieve_novice', name: '新手猎色', description: '累计收集 18 种常见颜色',
+    category: AchievementCategory.RARITY, color: '#FFD700', swatch: '#B2BEC3',
+    check: (ids) => countByRarity(ids, Rarity.COMMON) >= 18,
+  },
+  {
+    id: 'achieve_rare_finder', name: '稀有发现者', description: '累计收集 11 种稀有颜色',
+    category: AchievementCategory.RARITY, color: '#FFD700', swatch: '#74B9FF',
+    check: (ids) => countByRarity(ids, Rarity.RARE) >= 11,
+  },
+  {
+    id: 'achieve_epic_hunter', name: '史诗猎手', description: '累计收集 5 种史诗颜色',
+    category: AchievementCategory.RARITY, color: '#FFD700', swatch: '#A29BFE',
+    check: (ids) => countByRarity(ids, Rarity.EPIC) >= 5,
+  },
+  {
+    id: 'achieve_legend_eye', name: '传说之眼', description: '累计收集 2 种传说颜色',
+    category: AchievementCategory.RARITY, color: '#FFD700', swatch: '#FFD700',
+    check: (ids) => countByRarity(ids, Rarity.LEGENDARY) >= 2,
+  },
+  // ---- 特殊组合 ----
+  {
+    id: 'achieve_primary', name: '三原色', description: '集齐正红 + 明黄 + 天蓝',
+    category: AchievementCategory.COMBO, color: '#00B894', swatch: 'linear-gradient(135deg, #FF0000 33%, #FFD700 33%, #FFD700 66%, #87CEEB 66%)',
+    check: (ids) => ['red_red', 'yellow_bright', 'blue_sky'].every((id) => ids.includes(id)),
+  },
+  {
+    id: 'achieve_rainbow', name: '彩虹之路', description: '集齐红橙黄绿蓝靛紫 7 色',
+    category: AchievementCategory.COMBO, color: '#00B894', swatch: 'linear-gradient(90deg, #FF0000, #FFA500, #FFD700, #7CFC00, #87CEEB, #4B0082, #8F00FF)',
+    check: (ids) => {
+      const families = [ColorFamily.RED, ColorFamily.ORANGE, ColorFamily.YELLOW, ColorFamily.GREEN, ColorFamily.BLUE, ColorFamily.PURPLE]
+      return families.every((f) => ALL_COLORS.some((c) => c.family === f && ids.includes(c.id)))
+    },
+  },
+  {
+    id: 'achieve_warm_cool', name: '冷暖对决', description: '同时拥有 5 种暖色 + 5 种冷色',
+    category: AchievementCategory.COMBO, color: '#00B894', swatch: 'linear-gradient(135deg, #FF6B6B 50%, #74B9FF 50%)',
+    check: (ids) => {
+      const warm = ids.filter((id) => {
+        const c = ALL_COLORS.find((x) => x.id === id)
+        return c && [ColorFamily.RED, ColorFamily.ORANGE, ColorFamily.YELLOW].includes(c.family)
+      }).length
+      const cool = ids.filter((id) => {
+        const c = ALL_COLORS.find((x) => x.id === id)
+        return c && [ColorFamily.GREEN, ColorFamily.BLUE, ColorFamily.PURPLE].includes(c.family)
+      }).length
+      return warm >= 5 && cool >= 5
+    },
+  },
+  {
+    id: 'achieve_black_white', name: '黑白之间', description: '集齐黑 + 白 + 银',
+    category: AchievementCategory.COMBO, color: '#00B894', swatch: 'linear-gradient(135deg, #000000 33%, #FFFFFF 33%, #FFFFFF 66%, #C0C0C0 66%)',
+    check: (ids) => ['gray_black', 'gray_white', 'gray_silver'].every((id) => ids.includes(id)),
+  },
 ];
