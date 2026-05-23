@@ -1,0 +1,24 @@
+# ColorPal FastAPI 后端依赖
+# pip install -r requirements.txt
+
+# Web 框架
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.19
+
+# 数据库
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# OpenAI 客户端
+httpx==0.28.1
+
+# 数据校验
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# 图片处理（兜底评分）
+Pillow==11.1.0
+
+# 环境变量
+python-dotenv==1.0.1

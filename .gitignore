@@ -1,10 +1,29 @@
-# Visual Studio files
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and logs
+.env
+.env.local
+*.log
+
+# IDE and editor
+.idea/
+.vscode/
 .vs/
+*.swp
+*.swo
+*~
 *.user
 *.userosscache
-*.suo
 *.userprefs
-.vscode/
+*.suo
 *.vspscc
 *.vssscc
 .builds
@@ -13,22 +32,32 @@
 *.scc
 
 # OS files
+.DS_Store
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
-.DS_Store
+*.lnk
 
 # Local history
 .localhistory/
 .history/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# .NET
+bin/
+obj/
+
 # SQL Server files
 *.mdf
 *.ldf
 *.ndf
-
-# Node.js
-node_modules/
 
 # Installer files
 *.cab
@@ -37,8 +66,13 @@ node_modules/
 *.msm
 *.msp
 
-# Windows shortcuts
-*.lnk
+# Uploads and temp files
+uploads/
+temp/
+
+# Database files
+*.db
+*.db-journal
 
 # AI agent context files
 CLAUDE.md
