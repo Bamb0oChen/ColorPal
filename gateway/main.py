@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import photo, user, task
+from app.routers import achievements, collections, photo, task, user
 
 app = FastAPI(title="ColorPal API", description="你的色彩伙伴", version="2.0.0")
 
@@ -23,6 +23,8 @@ app.add_middleware(
 app.include_router(photo.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(task.router, prefix="/api/v1")
+app.include_router(achievements.router, prefix="/api/v1")
+app.include_router(collections.router, prefix="/api/v1")
 
 
 @app.on_event("startup")

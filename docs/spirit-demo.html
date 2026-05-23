@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ColorPal 小精灵演示</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "PingFang SC", sans-serif; background: #FFFAF7; display: flex; justify-content: center; padding: 40px 20px; }
+.container { max-width: 600px; width: 100%; }
+h1 { font-size: 24px; color: #2D3436; margin-bottom: 4px; }
+.sub { color: #636E72; font-size: 14px; margin-bottom: 24px; }
+.preview { background: white; border-radius: 16px; padding: 40px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 24px; min-height: 360px; }
+.controls { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); display: flex; flex-direction: column; gap: 20px; }
+.control-group { display: flex; flex-direction: column; gap: 8px; }
+.control-group label { font-size: 13px; font-weight: 600; color: #2D3436; }
+.color-row { display: flex; align-items: center; gap: 12px; }
+.color-row input[type="color"] { width: 48px; height: 48px; border: 2px solid #E8E8E8; border-radius: 8px; cursor: pointer; padding: 2px; }
+.color-row .hex-label { font-size: 14px; color: #636E72; font-family: monospace; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { padding: 8px 16px; border-radius: 8px; border: 1.5px solid #E8E8E8; background: white; font-size: 13px; color: #636E72; cursor: pointer; }
+.btn:hover { border-color: #FF7E67; color: #FF7E67; }
+.btn.active { background: #FF7E67; color: white; border-color: #FF7E67; }
+.stage-row { display: flex; gap: 8px; }
+.stage-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid #E8E8E8; background: white; cursor: pointer; text-align: center; font-size: 12px; color: #636E72; }
+.stage-btn.active { border-color: #A29BFE; background: #F8F6FF; color: #6C5CE7; font-weight: 600; }
+.stage-btn .stage-icon { font-size: 22px; margin-bottom: 2px; }
+.stage-btn .stage-label { font-size: 11px; }
+.presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #E8E8E8; cursor: pointer; transition: transform 0.15s; }
+.preset:hover { transform: scale(1.15); }
+.code-section { background: #F8F6FF; border-radius: 12px; padding: 16px; }
+.code-label { font-size: 13px; font-weight: 600; color: #6C5CE7; display: block; margin-bottom: 8px; }
+.code { font-family: monospace; font-size: 12px; color: #6C5CE7; white-space: pre-wrap; word-break: break-all; }
+.copy-btn { margin-top: 8px; padding: 6px 12px; border-radius: 6px; border: 1px solid #6C5CE7; background: white; color: #6C5CE7; cursor: pointer; font-size: 12px; }
+.copy-btn:hover { background: #6C5CE7; color: white; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔥 ColorPal 小火灵</h1>
+  <p class="sub">抖音小火人风格 · 火焰精灵 · 颜色随意变</p>
+
+  <div class="preview" id="preview">
+    <svg width="220" height="300" viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg" id="spiritSvg">
+      <defs>
+        <radialGradient id="bodyGrad" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" id="gradLight" stop-color="#FFB8A8" />
+          <stop offset="60%" id="gradMain" stop-color="#FF7E67" />
+          <stop offset="100%" id="gradDark" stop-color="#E86A54" />
+        </radialGradient>
+        <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" id="glowColor" stop-color="#FF7E67" stop-opacity="0.3" />
+          <stop offset="100%" stop-color="#FF7E67" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="bodyGlow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="white" stop-opacity="0.25" />
+          <stop offset="50%" stop-color="white" stop-opacity="0.05" />
+          <stop offset="100%" stop-color="white" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+
+      <!-- 背景光晕 -->
+      <ellipse cx="100" cy="130" rx="75" ry="65" fill="url(#glowGrad)">
+        <animate attributeName="opacity" values="0.4;0.7;0.4" dur="3s" repeatCount="indefinite" />
+      </ellipse>
+
+      <!-- 翅膀（成体+） -->
+      <g id="wings" opacity="0">
+        <!-- 左翅 -->
+        <path d="M 75 125 Q 30 105 15 130 Q 40 135 65 130" fill="#FFB8A8" fill-opacity="0.3" />
+        <!-- 右翅 -->
+        <path d="M 125 125 Q 170 105 185 130 Q 160 135 135 130" fill="#FFB8A8" fill-opacity="0.3" />
+      </g>
+
+      <!-- ====== 火焰主体 ====== -->
+      <!-- 外焰（半透明外层，增加火焰层次感） -->
+      <path id="outerFlame"
+        d="M 100 25
+           C 148 30, 168 80, 162 125
+           C 158 155, 145 175, 130 185
+           C 122 190, 115 180, 110 175
+           C 105 182, 100 188, 95 182
+           C 90 188, 85 180, 78 185
+           C 60 172, 42 150, 38 120
+           C 32 80, 52 30, 100 25 Z"
+        fill="url(#bodyGrad)" opacity="0.4"
+      />
+
+      <!-- 内焰（主体） -->
+      <path id="mainFlame"
+        d="M 100 40
+           C 138 45, 152 85, 148 120
+           C 145 148, 132 165, 120 172
+           C 115 176, 110 168, 106 164
+           C 102 170, 100 175, 97 170
+           C 94 175, 90 168, 85 172
+           C 72 162, 55 145, 52 115
+           C 48 85, 62 45, 100 40 Z"
+        fill="url(#bodyGrad)"
+      />
+
+      <!-- 面部区域高光 -->
+      <ellipse cx="100" cy="95" rx="30" ry="22" fill="url(#bodyGlow)" />
+
+      <!-- 左眼 -->
+      <ellipse id="eyeL" cx="86" cy="95" rx="4" ry="5" fill="#2D3436">
+        <animate attributeName="ry" values="5;1.5;5" dur="4s" repeatCount="indefinite" />
+      </ellipse>
+      <!-- 右眼 -->
+      <ellipse id="eyeR" cx="114" cy="95" rx="4" ry="5" fill="#2D3436">
+        <animate attributeName="ry" values="5;1.5;5" dur="4s" repeatCount="indefinite" />
+      </ellipse>
+
+      <!-- 眼睛高光 -->
+      <circle id="hlL" cx="84.5" cy="92" r="1.8" fill="white" fill-opacity="0.85" />
+      <circle id="hlR" cx="112.5" cy="92" r="1.8" fill="white" fill-opacity="0.85" />
+
+      <!-- 嘴巴 -->
+      <path id="mouth" d="M 94 108 Q 100 115 106 108" fill="none" stroke="#2D3436" stroke-width="2" stroke-linecap="round" />
+
+      <!-- 腮红（开心时） -->
+      <ellipse id="blushL" cx="70" cy="110" rx="8" ry="4.5" fill="#FF7E67" fill-opacity="0" />
+      <ellipse id="blushR" cx="130" cy="110" rx="8" ry="4.5" fill="#FF7E67" fill-opacity="0" />
+
+      <!-- 头顶火焰尖（3层火焰尖） -->
+      <path id="tip1" d="M 100 40 Q 93 30 96 20 Q 100 28 100 40 Z" fill="url(#bodyGrad)" />
+      <path id="tip2" d="M 100 40 Q 107 30 104 20 Q 100 28 100 40 Z" fill="url(#bodyGrad)" />
+      <path id="tip3" d="M 100 40 Q 100 25 100 15 Q 100 25 100 40 Z" fill="url(#bodyGrad)" opacity="0.6" />
+
+      <!-- 触角球 + 升级标识 -->
+      <circle id="hornBall" cx="100" cy="18" r="5" fill="#FFB8A8">
+        <animate attributeName="r" values="5;6.5;5" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="cy" values="18;16;18" dur="2s" repeatCount="indefinite" />
+      </circle>
+
+      <!-- 皇冠（成熟/完全体） -->
+      <g id="crownArea" opacity="0">
+        <!-- 成熟体皇冠 -->
+        <g id="crownNormal" opacity="1">
+          <path d="M 83 30 L 88 16 L 94 24 L 100 12 L 106 24 L 112 16 L 117 30 Z" fill="#A29BFE" />
+          <circle cx="100" cy="12" r="1.5" fill="white" />
+          <circle cx="88" cy="16" r="1.5" fill="white" />
+          <circle cx="112" cy="16" r="1.5" fill="white" />
+        </g>
+        <!-- 完全体皇冠（金色大皇冠） -->
+        <g id="crownElite" opacity="0">
+          <path d="M 78 32 L 85 8 L 93 20 L 100 3 L 107 20 L 115 8 L 122 32 Z" fill="#FFD700" />
+          <path d="M 78 32 L 85 8 L 93 20 L 100 3 L 107 20 L 115 8 L 122 32 Z" fill="none" stroke="#FFF3C4" stroke-width="1" />
+          <circle cx="100" cy="3" r="2.5" fill="#FFD700" />
+          <circle cx="85" cy="8" r="2" fill="#FFD700" />
+          <circle cx="115" cy="8" r="2" fill="#FFD700" />
+          <!-- 宝石 -->
+          <circle cx="100" cy="12" r="2" fill="#FF6B6B" />
+        </g>
+      </g>
+
+      <!-- 地面阴影 -->
+      <ellipse cx="100" cy="228" rx="32" ry="6" fill="#2D3436" fill-opacity="0.08">
+        <animate attributeName="rx" values="32;30;32" dur="2.5s" repeatCount="indefinite" />
+      </ellipse>
+
+      <!-- 漂浮粒子 -->
+      <circle cx="72" cy="170" r="2.5" fill="#FFB8A8" fill-opacity="0.5">
+        <animate attributeName="cy" values="170;155;170" dur="3s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="128" cy="175" r="2.5" fill="#FFB8A8" fill-opacity="0.5">
+        <animate attributeName="cy" values="175;160;175" dur="3.5s" begin="0.5s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="100" cy="185" r="2" fill="#FFB8A8" fill-opacity="0.4">
+        <animate attributeName="cy" values="185;170;185" dur="2.8s" begin="1s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="60" cy="155" r="2" fill="#FFB8A8" fill-opacity="0.3">
+        <animate attributeName="cy" values="155;142;155" dur="4s" begin="0.3s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="140" cy="160" r="2" fill="#FFB8A8" fill-opacity="0.3">
+        <animate attributeName="cy" values="160;147;160" dur="3.2s" begin="0.8s" repeatCount="indefinite" />
+      </circle>
+    </svg>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>🎨 精灵颜色</label>
+      <div class="color-row">
+        <input type="color" id="colorPicker" value="#FF7E67" />
+        <span class="hex-label" id="hexLabel">#FF7E67</span>
+      </div>
+    </div>
+    <div class="control-group">
+      <label>预设色卡</label>
+      <div class="presets" id="presets"></div>
+    </div>
+    <div class="control-group">
+      <label>😊 心情</label>
+      <div class="btn-group">
+        <button class="btn active" onclick="setMood('happy', this)">😄 开心</button>
+        <button class="btn" onclick="setMood('neutral', this)">😐 普通</button>
+        <button class="btn" onclick="setMood('sad', this)">😢 难过</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <label>🌟 进化阶段</label>
+      <div class="stage-row">
+        <div class="stage-btn active" onclick="setStage(0, this)"><div class="stage-icon">🔥</div><div class="stage-label">幼体 · 小火花</div></div>
+        <div class="stage-btn" onclick="setStage(1, this)"><div class="stage-icon">🌟</div><div class="stage-label">成体 · 火焰灵</div></div>
+        <div class="stage-btn" onclick="setStage(2, this)"><div class="stage-icon">👑</div><div class="stage-label">成熟 · 炎之君</div></div>
+        <div class="stage-btn" onclick="setStage(3, this)"><div class="stage-icon">✨</div><div class="stage-label">完全体 · 圣焰</div></div>
+      </div>
+    </div>
+    <div class="code-section">
+      <span class="code-label">📋 Vue 组件调用</span>
+      <div class="code" id="codeDisplay">&lt;ColorSpirit color="#FF7E67" :size="200" mood="happy" :stage="0" /&gt;</div>
+      <button class="copy-btn" onclick="copyCode()">复制代码</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const presets = [
+  { name: '珊瑚橙', hex: '#FF7E67' }, { name: '正红', hex: '#E34234' },
+  { name: '粉红', hex: '#FFC0CB' }, { name: '玫瑰红', hex: '#FF007F' },
+  { name: '橙', hex: '#FFA500' }, { name: '琥珀', hex: '#FFBF00' },
+  { name: '金黄', hex: '#FFD700' }, { name: '草绿', hex: '#7CFC00' },
+  { name: '翠绿', hex: '#50C878' }, { name: '天蓝', hex: '#87CEEB' },
+  { name: '海蓝', hex: '#000080' }, { name: '紫罗兰', hex: '#8F00FF' },
+  { name: '品红', hex: '#FF00FF' }, { name: '银', hex: '#C0C0C0' },
+  { name: '深灰', hex: '#2D3436' }, { name: '白', hex: '#F5F5F5' },
+]
+
+let curColor = '#FF7E67', curMood = 'happy', curStage = 0
+
+const presetsEl = document.getElementById('presets')
+presets.forEach(p => {
+  const el = document.createElement('div')
+  el.className = 'preset'; el.style.background = p.hex; el.title = p.name
+  el.onclick = () => { document.getElementById('colorPicker').value = p.hex; applyColor(p.hex) }
+  presetsEl.appendChild(el)
+})
+
+document.getElementById('colorPicker').addEventListener('input', e => applyColor(e.target.value))
+applyColor('#FF7E67')
+
+function applyColor(hex) {
+  curColor = hex
+  document.getElementById('hexLabel').textContent = hex
+  const l = lighten(hex, 35), d = darken(hex, 25)
+  document.getElementById('gradLight').setAttribute('stop-color', l)
+  document.getElementById('gradMain').setAttribute('stop-color', hex)
+  document.getElementById('gradDark').setAttribute('stop-color', d)
+  document.getElementById('glowColor').setAttribute('stop-color', hex)
+  document.getElementById('blushL').setAttribute('fill', hex)
+  document.getElementById('blushR').setAttribute('fill', hex)
+  document.querySelectorAll('#wings path').forEach(el => el.setAttribute('fill', l))
+  document.querySelectorAll('[id^="tip"]').forEach(el => el.setAttribute('fill', `url(#bodyGrad)`))
+  document.querySelectorAll('circle[fill="#FFB8A8"]').forEach(el => {
+    if (!el.id.startsWith('hl') && el.id !== 'crownBall') el.setAttribute('fill', l)
+  })
+  if (curStage < 1) document.getElementById('hornBall').setAttribute('fill', l)
+  updateCode()
+}
+
+function setMood(mood, btn) {
+  curMood = mood
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  const m = document.getElementById('mouth'), bL = document.getElementById('blushL'), bR = document.getElementById('blushR')
+  const eL = document.getElementById('eyeL'), eR = document.getElementById('eyeR')
+  if (mood === 'happy') {
+    m.setAttribute('d', 'M 93 108 Q 100 117 107 108')
+    bL.setAttribute('fill-opacity', '0.2'); bR.setAttribute('fill-opacity', '0.2')
+    eL.setAttribute('ry', '5'); eR.setAttribute('ry', '5')
+  } else if (mood === 'sad') {
+    m.setAttribute('d', 'M 94 116 Q 100 108 106 116')
+    bL.setAttribute('fill-opacity', '0'); bR.setAttribute('fill-opacity', '0')
+    eL.setAttribute('ry', '6.5'); eR.setAttribute('ry', '6.5')
+  } else {
+    m.setAttribute('d', 'M 95 110 Q 100 113 105 110')
+    bL.setAttribute('fill-opacity', '0'); bR.setAttribute('fill-opacity', '0')
+    eL.setAttribute('ry', '5'); eR.setAttribute('ry', '5')
+  }
+  updateCode()
+}
+
+function setStage(stage, btn) {
+  curStage = stage
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  const w = document.getElementById('wings'), c = document.getElementById('crownArea')
+  const cn = document.getElementById('crownNormal'), ce = document.getElementById('crownElite')
+  const ball = document.getElementById('hornBall')
+  w.setAttribute('opacity', '0'); c.setAttribute('opacity', '0')
+  if (stage >= 1) w.setAttribute('opacity', stage >= 2 ? '1' : '0.5')
+  if (stage >= 2) { c.setAttribute('opacity', '1'); cn.setAttribute('opacity', '1'); ce.setAttribute('opacity', '0') }
+  if (stage >= 3) { c.setAttribute('opacity', '1'); cn.setAttribute('opacity', '0'); ce.setAttribute('opacity', '1') }
+  if (stage >= 3) ball.setAttribute('fill', '#FFD700')
+  else if (stage >= 2) ball.setAttribute('fill', '#A29BFE')
+  else if (stage >= 1) ball.setAttribute('fill', '#74B9FF')
+  else ball.setAttribute('fill', lighten(curColor, 35))
+  updateCode()
+}
+
+function updateCode() {
+  document.getElementById('codeDisplay').textContent =
+    `<ColorSpirit color="${curColor}" :size="200" mood="${curMood}" :stage="${curStage}" />`
+}
+function copyCode() {
+  const c = document.getElementById('codeDisplay').textContent
+  navigator.clipboard.writeText(c).then(() => { const b = document.querySelector('.copy-btn'); b.textContent = '✅ 已复制'; setTimeout(() => { b.textContent = '复制代码' }, 1500) })
+}
+function lighten(h, p) { const {r,g,b}=hexToRgb(h); const f=1+p/100; return `#${Math.min(255,Math.round(r*f)).toString(16).padStart(2,'0')}${Math.min(255,Math.round(g*f)).toString(16).padStart(2,'0')}${Math.min(255,Math.round(b*f)).toString(16).padStart(2,'0')}` }
+function darken(h, p) { const {r,g,b}=hexToRgb(h); const f=1-p/100; return `#${Math.round(r*f).toString(16).padStart(2,'0')}${Math.round(g*f).toString(16).padStart(2,'0')}${Math.round(b*f).toString(16).padStart(2,'0')}` }
+function hexToRgb(h) { const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h); return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)}:{r:255,g:126,b:103} }
+</script>
+</body>
+</html>

@@ -1,29 +1,10 @@
 import http from './request'
-
-export interface UploadResponse {
-  photo_id: string
-  analysis: {
-    dominant_color: string
-    palette: string[]
-    score: number
-    comment: string
-    color_category: string
-    saturation_level: string
-    brightness_level: string
-  }
-  energy_change: {
-    r: number
-    g: number
-    b: number
-    total: number
-  }
-  task_completed: string | null
-}
+import type { PhotoAnalyzeData } from '@/types/photo'
 
 export const uploadAndAnalyze = async (
   file: File,
   location?: { lat: number; lng: number },
-): Promise<UploadResponse> => {
+): Promise<PhotoAnalyzeData> => {
   const formData = new FormData()
   formData.append('image', file)
   if (location) {

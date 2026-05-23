@@ -51,6 +51,7 @@ async def analyze_photo(
                 "analysis": analysis,
                 "energy_change": saved["energy_change"],
                 "task_completed": None,
+                "achievements_unlocked": [],
             },
             "message": "ok",
         }
