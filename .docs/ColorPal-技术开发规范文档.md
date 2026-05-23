@@ -1,137 +1,257 @@
 # ColorPal 技术开发规范文档
 
-> **版本**：v1.0
+> **版本**：v2.0
 > **适用对象**：全体开发成员
-> **目标**：统一技术栈、规范代码风格、明确协作流程、预设突发应对
+> **技术栈**：Vue 3 + FastAPI + C# (.NET)
+> **日期**：2026.05
 
 ---
 
 ## 1. 文件架构
 
-### 1.1 项目目录结构
+### 1.1 系统架构总览
 
 ```
-colopal/
-├── client/                          # 前端（微信小程序）
-│   ├── app.js                       # 小程序入口
-│   ├── app.json                     # 全局配置
-│   ├── app.wxss                     # 全局样式
-│   ├── project.config.json          # 项目配置
-│   ├── sitemap.json                 # 搜索配置
-│   │
-│   ├── pages/                       # 页面
-│   │   ├── home/                    # 首页（拍照 + 小人 + 任务）
-│   │   │   ├── home.js
-│   │   │   ├── home.wxml
-│   │   │   ├── home.wxss
-│   │   │   └── home.json
-│   │   ├── result/                  # 评分结果页
-│   │   │   ├── result.js
-│   │   │   ├── result.wxml
-│   │   │   ├── result.wxss
-│   │   │   └── result.json
-│   │   ├── map/                     # 地图页
-│   │   │   ├── map.js
-│   │   │   ├── map.wxml
-│   │   │   ├── map.wxss
-│   │   │   └── map.json
-│   │   ├── collection/              # 图鉴页
-│   │   │   ├── collection.js
-│   │   │   ├── collection.wxml
-│   │   │   ├── collection.wxss
-│   │   │   └── collection.json
-│   │   └── profile/                 # 个人页
-│   │       ├── profile.js
-│   │       ├── profile.wxml
-│   │       ├── profile.wxss
-│   │       └── profile.json
-│   │
-│   ├── components/                  # 公共组件
-│   │   ├── pet-display/             # 小人展示组件
-│   │   ├── score-card/              # 评分卡片组件
-│   │   ├── task-bubble/             # 任务气泡组件
-│   │   └── color-palette/           # 调色板展示组件
-│   │
-│   ├── services/                    # 服务层（API 封装）
-│   │   ├── api.js                   # 通用请求封装
-│   │   ├── photo.js                 # 照片相关 API
-│   │   ├── user.js                  # 用户相关 API
-│   │   └── task.js                  # 任务相关 API
-│   │
-│   ├── utils/                       # 工具函数
-│   │   ├── color.js                 # 色彩工具（RGB/HSL 转换等）
-│   │   ├── format.js                # 格式化工具
-│   │   └── constants.js             # 常量定义
-│   │
-│   └── assets/                      # 静态资源
-│       ├── images/
-│       └── icons/
+┌─────────────┐     HTTP     ┌──────────────┐     gRPC/HTTP    ┌────────────┐
+│  Vue 3 前端  │ ──────────→  │  FastAPI 网关  │ ─────────────→  │  C# 后端服务 │
+│  (Web App)   │ ←──────────  │  (中间层)     │ ←─────────────  │  (.NET)     │
+└─────────────┘              └──────┬───────┘                  └────────────┘
+                                    │
+                                    ├──→ GPT-4V Vision API
+                                    └──→ 规则评分引擎 (兜底)
+```
+
+**数据流向**：
+1. 用户拍照 → Vue 3 前端 → 上传图片 → FastAPI → GPT-4V 分析
+2. AI 结果 → FastAPI 校验/后处理 → C# 后端存储 → 返回给前端
+3. 前端展示评分结果 → 更新小人状态 → 完成闭环
+
+### 1.2 项目目录结构
+
+```
+colopal/                                  # 项目根目录
 │
-├── cloud/                           # 云开发
-│   ├── functions/                   # 云函数
-│   │   ├── analyzeColor/            # AI 颜色分析
-│   │   │   ├── index.js
-│   │   │   ├── prompt.js            # Prompt 模板
-│   │   │   └── scoring.js           # 评分规则引擎
-│   │   ├── userManager/             # 用户管理
-│   │   │   └── index.js
-│   │   ├── photoManager/            # 照片管理
-│   │   │   └── index.js
-│   │   └── taskManager/             # 任务管理
-│   │       └── index.js
-│   └── database/                    # 数据库
-│       ├── schema.md                # 数据模型说明
-│       └── init.js                  # 初始化脚本
-│
-├── docs/                            # 项目文档
-│   ├── 产品需求文档.md
-│   ├── 技术方案文档.md
-│   └── 技术开发规范文档.md
-│
-├── scripts/                         # 工具脚本
-│   └── compress-image.js            # 图片压缩脚本
-│
+├── docker-compose.yml                    # 【第一层】全局容器编排配置
+├── .env                                  # 【第一层】全局环境变量
+├── .env.example                          # 【第一层】环境变量模板
 ├── .gitignore
 ├── README.md
-└── package.json
+├── package.json                          # 根级脚本（可选）
+│
+├── config/                               # 【第一层】配置文件目录
+│   ├── frontend/                         # 前端配置
+│   │   ├── .env.development
+│   │   ├── .env.production
+│   │   └── proxy.conf.js                 # 开发代理配置
+│   ├── gateway/                          # FastAPI 配置
+│   │   ├── config.dev.yaml
+│   │   ├── config.prod.yaml
+│   │   └── logging.conf
+│   └── backend/                          # C# 后端配置
+│       ├── appsettings.json
+│       ├── appsettings.Development.json
+│       └── appsettings.Production.json
+│
+├── frontend/                             # Vue 3 前端项目
+│   ├── vite.config.ts                    # Vite 构建配置
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   ├── package.json
+│   ├── index.html
+│   ├── public/
+│   │   ├── favicon.ico
+│   │   └── images/                       # 静态图片
+│   └── src/
+│       ├── main.ts                       # 应用入口
+│       ├── App.vue                       # 根组件
+│       ├── router/
+│       │   └── index.ts                  # 路由配置
+│       ├── stores/                       # Pinia 状态管理
+│       │   ├── pet.ts                    # 小人状态
+│       │   ├── photo.ts                  # 照片状态
+│       │   └── task.ts                   # 任务状态
+│       ├── api/                          # API 请求层
+│       │   ├── request.ts                # Axios 封装
+│       │   ├── photo.ts                  # 照片 API
+│       │   ├── user.ts                   # 用户 API
+│       │   └── task.ts                   # 任务 API
+│       ├── views/                        # 页面组件
+│       │   ├── HomeView.vue              # 首页（拍照入口 + 小人）
+│       │   ├── ResultView.vue            # 评分结果页
+│       │   ├── MapView.vue               # 地图页
+│       │   ├── CollectionView.vue        # 图鉴页
+│       │   └── ProfileView.vue           # 个人页
+│       ├── components/                   # 公共组件
+│       │   ├── pet/
+│       │   │   ├── PetDisplay.vue        # 小人展示
+│       │   │   └── PetEnergyBar.vue      # 能量条
+│       │   ├── score/
+│       │   │   ├── ScoreCard.vue         # 评分卡片
+│       │   │   └── ColorPalette.vue      # 调色板
+│       │   ├── task/
+│       │   │   └── TaskBubble.vue        # 任务气泡
+│       │   └── common/
+│       │       ├── LoadingSpinner.vue
+│       │       └── EmptyState.vue
+│       ├── composables/                  # 组合式函数
+│       │   ├── useCamera.ts              # 相机逻辑
+│       │   ├── useLocation.ts            # 定位逻辑
+│       │   └── useShare.ts               # 分享逻辑
+│       ├── utils/                        # 工具函数
+│       │   ├── color.ts                  # 色彩转换
+│       │   ├── format.ts                 # 格式化
+│       │   └── constants.ts              # 常量定义
+│       ├── types/                        # TypeScript 类型
+│       │   ├── pet.ts
+│       │   ├── photo.ts
+│       │   └── task.ts
+│       └── styles/                       # 全局样式
+│           ├── variables.css             # CSS 变量
+│           └── global.css                # 全局样式
+│
+├── gateway/                              # FastAPI 中间层
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── pyproject.toml
+│   ├── main.py                          # 应用入口
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── config.py                    # 配置读取
+│   │   ├── routers/                     # 路由
+│   │   │   ├── __init__.py
+│   │   │   ├── photo.py                 # 照片分析路由
+│   │   │   ├── user.py                  # 用户路由（转发）
+│   │   │   └── task.py                  # 任务路由（转发）
+│   │   ├── services/                    # 业务服务
+│   │   │   ├── __init__.py
+│   │   │   ├── ai_analyzer.py           # AI 视觉分析
+│   │   │   ├── scorer.py                # 评分规则引擎
+│   │   │   └── backend_client.py        # C# 后端 HTTP 客户端
+│   │   ├── models/                      # Pydantic 模型
+│   │   │   ├── __init__.py
+│   │   │   ├── photo.py
+│   │   │   └── pet.py
+│   │   └── middleware/                  # 中间件
+│   │       ├── __init__.py
+│   │       ├── cors.py                  # 跨域配置
+│   │       └── logging.py               # 日志
+│   └── tests/                           # 测试
+│       ├── __init__.py
+│       ├── test_ai_analyzer.py
+│       └── test_scorer.py
+│
+├── backend/                              # C# (.NET) 后端服务
+│   ├── Colopal.sln                       # 解决方案文件
+│   ├── Dockerfile
+│   ├── Directory.Build.props             # 全局构建配置
+│   └── Colopal.Api/                     # Web API 项目
+│       ├── Program.cs                    # 应用入口
+│       ├── Colopal.Api.csproj
+│       ├── Controllers/                  # API 控制器
+│       │   ├── PhotoController.cs
+│       │   ├── UserController.cs
+│       │   ├── TaskController.cs
+│       │   └── CollectionController.cs
+│       ├── Models/                       # 数据模型
+│       │   ├── User.cs
+│       │   ├── Photo.cs
+│       │   ├── Pet.cs
+│       │   └── Task.cs
+│       ├── Services/                     # 业务服务
+│       │   ├── IUserService.cs           # 接口
+│       │   ├── UserService.cs            # 实现
+│       │   ├── ITaskService.cs
+│       │   ├── TaskService.cs
+│       │   ├── IPhotoService.cs
+│       │   └── PhotoService.cs
+│       ├── Data/                         # 数据访问
+│       │   ├── AppDbContext.cs
+│       │   └── Migrations/
+│       ├── DTOs/                         # 数据传输对象
+│       │   ├── PhotoDto.cs
+│       │   └── UserDto.cs
+│       └── Middleware/
+│           ├── ExceptionMiddleware.cs
+│           └── RequestLoggingMiddleware.cs
+│
+├── docs/                                 # 项目文档
+│   ├── 产品需求文档.md
+│   ├── 技术方案文档.md
+│   ├── 技术开发规范文档.md
+│   └── 团队分工文档.md
+│
+├── scripts/                              # 工具脚本
+│   ├── start-dev.sh                      # 一键启动开发环境
+│   ├── compress-image.py                 # 图片压缩
+│   └── seed-data.py                      # 演示数据填充
+│
+└── assets/                               # 共享设计资源
+    ├── pet-sprites/                      # 小人素材
+    └── poster/                           # 路演海报素材
 ```
 
-### 1.2 命名规范
+### 1.3 命名规范
 
-| 类型 | 规范 | 示例 |
+| 层级 | 规范 | 示例 |
 |------|------|------|
-| 目录名 | 小驼峰 | `petDisplay/`、`scoreCard/` |
-| 页面目录 | 全小写 | `pages/home/`、`pages/result/` |
-| JS 文件 | 小驼峰 | `home.js`、`colorUtils.js` |
-| 组件 | 连字符 | `pet-display`、`score-card` |
-| CSS 类名 | 连字符 | `.pet-container`、`.score-value` |
-| 云函数 | 小驼峰 | `analyzeColor`、`userManager` |
-| 图片资源 | 全小写连字符 | `pet-happy.png`、`icon-camera.svg` |
+| 前端组件 | PascalCase | `PetDisplay.vue`、`ScoreCard.vue` |
+| 前端路由 | kebab-case | `/photo-result`、`/color-map` |
+| FastAPI 路由 | 小写蛇形 | `/api/v1/photo/analyze` |
+| C# Controller | PascalCase + Controller 后缀 | `PhotoController.cs` |
+| C# 接口 | I + PascalCase | `IPhotoService.cs` |
+| Python 文件 | 小写蛇形 | `ai_analyzer.py`、`backend_client.py` |
+| 数据库集合/表 | 小写蛇形 | `users`、`photo_records` |
+| 配置文件 | 按层级嵌套 | `config/gateway/config.dev.yaml` |
 
 ---
 
 ## 2. 主要技术栈
 
-### 2.1 MVP 技术栈
+### 2.1 技术选型
 
-| 层级 | 技术选型 | 版本 | 选型理由 |
-|------|----------|------|----------|
-| 前端框架 | 微信小程序原生 | — | 开箱即用、分享方便、生态成熟 |
-| 地图组件 | 微信内置 map | — | 小程序原生支持，免配置 |
-| 后端 | 微信云开发 | — | 与小程序无缝集成，无需运维 |
-| 数据库 | 云数据库（MongoDB） | — | 灵活 Schema，适合 MVP |
-| AI 视觉 | OpenAI GPT-4V API | gpt-4-vision-preview | 颜色提取 + 评分一次调用 |
-| 图片存储 | 云存储 | — | 云开发配套 |
-| 小人动画 | Lottie + SVG | lottie-miniprogram@1.x | 轻量动画方案 |
+| 层级 | 技术 | 版本要求 | 说明 |
+|------|------|----------|------|
+| **前端** | Vue 3 | ^3.4 | Composition API + `<script setup>` |
+| | Vite | ^5.0 | 构建工具 |
+| | TypeScript | ^5.3 | 类型安全 |
+| | Pinia | ^2.1 | 状态管理 |
+| | Vue Router | ^4.2 | 路由 |
+| | Axios | ^1.6 | HTTP 请求 |
+| | Lottie Web | ^5.12 | 小人动画 |
+| | Leaflet / Mapbox GL JS | — | 地图组件 |
+| **网关** | FastAPI | ^0.110 | Python 异步 Web 框架 |
+| | httpx | ^0.27 | 异步 HTTP 客户端（调用 C# + AI） |
+| | python-multipart | — | 文件上传支持 |
+| | Pydantic | ^2.0 | 数据校验 |
+| **后端** | .NET 8 | 8.0+ | C# Web API |
+| | Entity Framework Core | 8.0+ | ORM |
+| | SQLite / PostgreSQL | — | 数据库 |
+| | Swashbuckle | — | Swagger 文档 |
+| **AI** | OpenAI API | gpt-4-vision-preview | 视觉分析 |
+| **部署** | Docker + Docker Compose | — | 容器化 |
 
-### 2.2 开发工具
+### 2.2 数据流说明
 
-| 工具 | 用途 |
-|------|------|
-| 微信开发者工具 | 小程序开发调试 |
-| VSCode | 代码编辑 |
-| Git + GitHub | 版本控制 |
-| 飞书/钉钉 | 团队沟通 |
+```
+[浏览器]                    [FastAPI]                  [C# Backend]
+   │                          │                           │
+   │── POST /api/v1/photo ──→ │                           │
+   │  (multipart: image)      │── httpx ──→ GPT-4V ──→   │
+   │                          │←── JSON 结果 ───────────  │
+   │                          │                           │
+   │                          │── httpx ──→ POST /photo ─→│
+   │                          │         (分析结果)         │── 存入数据库
+   │                          │←── 201 Created ──────────│
+   │                          │                           │
+   │←── 评分 + 小人能量变化 ── │                           │
+```
+
+FastAPI 是**唯一入口**，前端只与 FastAPI 通信，不直接调用 C#：
+
+```
+前端 → FastAPI (AI 分析 + 路由转发) → C# (持久化 + 业务逻辑)
+     ←                             ←
+```
 
 ---
 
@@ -139,135 +259,451 @@ colopal/
 
 ### 3.1 通用编码规范
 
-#### 缩进与格式
-- 使用 **2 空格**缩进，不使用 Tab
-- 行尾加分号
-- 单行不超过 100 字符
-- 文件末尾保留一个空行
+- **缩进**：2 空格（所有语言统一）
+- **编码**：UTF-8
+- **行尾**：LF（不是 CRLF）
+- **单行上限**：100 字符（前端/网关）/ 120 字符（C#）
+- **文件末尾**：保留一个空行
+- **注释**：用中文，解释为什么而非是什么
 
-#### 命名规范
-- **变量/函数**：`camelCase`（小驼峰）
-- **常量**：`UPPER_SNAKE_CASE`（全大写下划线）
-- **类/构造函数**：`PascalCase`（大驼峰）
-- **文件/目录**：遵循 1.2 节命名规范
-- **布尔值**：用 `is` / `has` / `should` 前缀，如 `isLoading`、`hasPermission`
+### 3.2 Vue 3 / TypeScript 规范
 
-#### 注释规范
-- 使用**中文注释**（团队沟通方便）
-- 函数签名用 JSDoc 风格
-- 不写「显而易见」的注释
+```typescript
+// ============ 组件规范：<script setup> + TypeScript ============
 
-```javascript
-// ✅ 好的注释：解释为什么
-// 压缩到 720px 宽度，平衡上传速度与颜色分析质量
-const MAX_WIDTH = 720
-
-// ❌ 不好的注释：解释是什么
-// 设置最大宽度为 720
-const MAX_WIDTH = 720
-```
-
-### 3.2 JavaScript 规范
-
-```javascript
-// ============ 变量声明 ============
-// 优先用 const，只有确定会重新赋值才用 let
-const energy = calculateEnergy(score)
-let currentTaskId = null
-
-// 解构赋值
-const { dominantColor, palette, score } = analysisResult
-const [primary, ...rest] = palette
-
-// ============ 函数 ============
-// 箭头函数优先
-const formatScore = (score) => {
-  return Math.min(100, Math.max(0, score))
-}
-
-// 异步函数用 async/await
-const analyzePhoto = async (imageUrl) => {
-  const result = await callAI(imageUrl)
-  return validateResult(result)
-}
-
-// ============ 对象 ============
-// 简写属性
-const color = { dominantColor, palette, score }
-
-// 可选链
-const comment = result?.analysis?.comment ?? '暂无评价'
-
-// ============ 条件判断 ============
-// 早期返回
-const getPetMood = (avgScore) => {
-  if (avgScore >= 70) return 'happy'
-  if (avgScore >= 40) return 'neutral'
-  return 'sad'
+// 命名导出，不写默认导出
+export interface PetInfo {
+  name: string
+  stage: number
+  mood: 'happy' | 'neutral' | 'sad'
+  energy: {
+    current: number
+    max: number
+  }
 }
 ```
 
-### 3.3 微信小程序规范
+```vue
+<!-- 组件模板：script setup + 类型标注 -->
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import type { PetInfo } from '@/types/pet'
 
-```javascript
-// Page 定义
-Page({
-  // 数据集中放在 data 顶部
-  data: {
-    petInfo: null,
-    scoreCard: null,
-    isLoading: false,
-  },
+// Props 用类型标注
+const props = defineProps<{
+  petInfo: PetInfo
+  isLoading?: boolean
+}>()
 
-  // 生命周期靠前
-  onLoad() {
-    this.initData()
-  },
+// Emits 用类型标注
+const emit = defineEmits<{
+  takePhoto: []
+  evolve: [petId: string]
+}>()
 
-  // 自定义方法用小驼峰
-  async initData() {
-    this.setData({ isLoading: true })
+// 响应式数据
+const showTask = ref(false)
+
+// 计算属性
+const energyPercent = computed(() => {
+  const { current, max } = props.petInfo.energy
+  return Math.min(100, Math.round((current / max) * 100))
+})
+
+// 方法：普通函数
+const handleTap = () => {
+  emit('takePhoto')
+}
+</script>
+
+<template>
+  <div class="pet-container" :class="{ 'is-loading': isLoading }">
+    <div class="pet-avatar" @click="handleTap">
+      <PetEnergyBar :percent="energyPercent" />
+    </div>
+    <TaskBubble v-if="showTask" />
+  </div>
+</template>
+
+<style scoped>
+.pet-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+</style>
+```
+
+#### Pinia Store 规范
+
+```typescript
+// stores/pet.ts
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { getPetProfile } from '@/api/user'
+import type { PetInfo } from '@/types/pet'
+
+export const usePetStore = defineStore('pet', () => {
+  // state
+  const petInfo = ref<PetInfo | null>(null)
+  const isLoading = ref(false)
+
+  // getter
+  const energyPercent = computed(() => {
+    if (!petInfo.value) return 0
+    return Math.round(petInfo.value.energy.current / petInfo.value.energy.max * 100)
+  })
+
+  // action
+  const fetchProfile = async () => {
+    isLoading.value = true
     try {
-      const profile = await getUserProfile()
-      this.setData({ petInfo: profile.pet })
+      petInfo.value = await getPetProfile()
     } finally {
-      this.setData({ isLoading: false })
+      isLoading.value = false
     }
-  },
+  }
 
-  // 事件处理函数用 handle 前缀
-  handleTakePhoto() {
-    wx.chooseMedia({
-      success: (res) => this.uploadPhoto(res.tempFilePath),
-    })
-  },
+  return { petInfo, isLoading, energyPercent, fetchProfile }
 })
 ```
 
-### 3.4 云函数规范
+#### API 层规范
 
-```javascript
-// 云函数结构：统一使用 exports.main
-const cloud = require('wx-server-sdk')
-cloud.init()
+```typescript
+// api/request.ts
+import axios from 'axios'
+import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 
-const ERROR_CODES = {
-  INVALID_INPUT: 400,
-  AI_TIMEOUT: 502,
-  NOT_FOUND: 404,
+const GATEWAY_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+
+const http: AxiosInstance = axios.create({
+  baseURL: `${GATEWAY_BASE}/api/v1`,
+  timeout: 15000,
+})
+
+// 响应拦截
+http.interceptors.response.use(
+  (res) => res.data,
+  (err) => {
+    const message = err.response?.data?.detail || '请求失败，请重试'
+    console.error('[API Error]', message)
+    return Promise.reject(err)
+  },
+)
+
+export default http
+```
+
+```typescript
+// api/photo.ts
+import http from './request'
+import type { AnalysisResult } from '@/types/photo'
+
+export interface UploadResponse {
+  photoId: string
+  analysis: AnalysisResult
+  energyChange: { r: number; g: number; b: number; total: number }
 }
 
-exports.main = async (event, context) => {
-  const { action, data } = event
-
-  switch (action) {
-    case 'analyze':
-      return await handleAnalyze(data)
-    case 'detail':
-      return await handleDetail(data)
-    default:
-      return { code: ERROR_CODES.INVALID_INPUT, message: '未知操作' }
+export const uploadAndAnalyze = async (
+  file: File,
+  location?: { lat: number; lng: number },
+): Promise<UploadResponse> => {
+  const formData = new FormData()
+  formData.append('image', file)
+  if (location) {
+    formData.append('lat', String(location.lat))
+    formData.append('lng', String(location.lng))
   }
+
+  return http.post('/photo/analyze', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+```
+
+### 3.3 FastAPI 规范
+
+```python
+# app/routers/photo.py
+"""
+照片分析路由
+接收前端上传的图片，调用 AI 分析，转发结果到 C# 后端
+"""
+
+import logging
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from app.services.ai_analyzer import analyze_image
+from app.services.backend_client import save_photo_record
+from app.models.photo import PhotoAnalysisResponse
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/photo", tags=["photo"])
+
+
+@router.post("/analyze", response_model=PhotoAnalysisResponse)
+async def analyze_photo(
+    image: UploadFile = File(...),
+    lat: float = Form(None),
+    lng: float = Form(None),
+):
+    """
+    上传照片并分析颜色
+    - 先调用 GPT-4V 分析
+    - AI 失败时走兜底规则评分
+    - 将结果转发给 C# 后端持久化
+    """
+    # 校验图片格式
+    if image.content_type not in ("image/jpeg", "image/png", "image/webp"):
+        raise HTTPException(status_code=400, detail="不支持的图片格式")
+
+    try:
+        image_bytes = await image.read()
+
+        # 主路径：AI 分析
+        analysis = await analyze_image(image_bytes)
+
+        # 转发到 C# 后端持久化
+        saved = await save_photo_record(
+            image_bytes=image_bytes,
+            analysis=analysis,
+            location={"lat": lat, "lng": lng} if lat else None,
+        )
+
+        return PhotoAnalysisResponse(
+            photo_id=saved["id"],
+            analysis=analysis,
+            energy_change=saved["energy_change"],
+        )
+
+    except Exception as err:
+        logger.exception("照片分析失败")
+        raise HTTPException(status_code=500, detail=f"分析失败: {str(err)}")
+```
+
+```python
+# app/services/ai_analyzer.py
+"""
+AI 视觉分析服务
+主路径调用 GPT-4V，兜底走规则评分
+"""
+
+import json
+import httpx
+from app.core.config import settings
+from app.services.scorer import fallback_score
+
+SYSTEM_PROMPT = """你是一位专业的色彩分析师。分析这张照片，输出 JSON。"""
+
+TIMEOUT_SECONDS = 15
+
+
+async def analyze_image(image_bytes: bytes) -> dict:
+    """分析图片颜色，返回评分 + 调色板"""
+    try:
+        return await call_gpt4v(image_bytes)
+    except Exception as err:
+        logger.warning(f"GPT-4V 失败，切换到兜底评分: {err}")
+        return fallback_score(image_bytes)
+
+
+async def call_gpt4v(image_bytes: bytes) -> dict:
+    """调用 OpenAI GPT-4V API"""
+    base64_image = base64.b64encode(image_bytes).decode()
+
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+        resp = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4-vision-preview",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": USER_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}",
+                                },
+                            },
+                        ],
+                    },
+                ],
+                "max_tokens": 500,
+            },
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        return json.loads(result["choices"][0]["message"]["content"])
+```
+
+```python
+# app/services/backend_client.py
+"""
+C# 后端 HTTP 客户端
+将分析结果转发给 .NET 服务持久化
+"""
+
+import httpx
+from app.core.config import settings
+
+
+async def save_photo_record(
+    image_bytes: bytes,
+    analysis: dict,
+    location: dict | None,
+) -> dict:
+    """将分析结果保存到 C# 后端"""
+    base64_image = base64.b64encode(image_bytes).decode()
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{settings.BACKEND_BASE_URL}/api/photos",
+            json={
+                "image_base64": base64_image,
+                "analysis": analysis,
+                "location": location,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()
+```
+
+### 3.4 C# 规范
+
+```csharp
+// Controllers/PhotoController.cs
+using Microsoft.AspNetCore.Mvc;
+using Colopal.Api.Services;
+using Colopal.Api.DTOs;
+
+namespace Colopal.Api.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class PhotoController : ControllerBase
+{
+    private readonly IPhotoService _photoService;
+    private readonly ILogger<PhotoController> _logger;
+
+    public PhotoController(IPhotoService photoService, ILogger<PhotoController> logger)
+    {
+        _photoService = photoService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// 保存照片分析结果
+    /// 由 FastAPI 网关调用，前端不直接访问此接口
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<PhotoSaveResponse>> SavePhoto(
+        [FromBody] SavePhotoRequest request)
+    {
+        if (request.Analysis == null)
+            return BadRequest(new { message = "缺少分析结果" });
+
+        try
+        {
+            var result = await _photoService.SaveAsync(request);
+            return Created($"/api/photos/{result.Id}", result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存照片失败");
+            return StatusCode(500, new { message = "保存失败" });
+        }
+    }
+
+    /// <summary>
+    /// 获取用户的地图标记点
+    /// </summary>
+    [HttpGet("map-points/{userId}")]
+    public async Task<ActionResult<List<MapPointDto>>> GetMapPoints(
+        string userId)
+    {
+        var points = await _photoService.GetMapPointsAsync(userId);
+        return Ok(points);
+    }
+}
+```
+
+```csharp
+// Services/PhotoService.cs
+namespace Colopal.Api.Services;
+
+public class PhotoService : IPhotoService
+{
+    private readonly AppDbContext _db;
+    private readonly ILogger<PhotoService> _logger;
+
+    public PhotoService(AppDbContext db, ILogger<PhotoService> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
+
+    public async Task<PhotoSaveResponse> SaveAsync(SavePhotoRequest request)
+    {
+        var photo = new Photo
+        {
+            Id = Guid.NewGuid().ToString(),
+            ImageBase64 = request.ImageBase64,
+            DominantColor = request.Analysis.DominantColor,
+            Score = request.Analysis.Score,
+            Comment = request.Analysis.Comment,
+            Palette = string.Join(",", request.Analysis.Palette),
+            Latitude = request.Location?.Lat,
+            Longitude = request.Location?.Lng,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        _db.Photos.Add(photo);
+
+        // 更新用户能量
+        var user = await _db.Users.FindAsync(request.UserId);
+        if (user != null)
+        {
+            var (r, g, b) = ParseColor(request.Analysis.DominantColor);
+            user.EnergyR += r;
+            user.EnergyG += g;
+            user.EnergyB += b;
+            user.TotalPhotos++;
+            user.LastPhotoAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+
+        return new PhotoSaveResponse
+        {
+            Id = photo.Id,
+            EnergyChange = new EnergyChangeDto
+            {
+                R = user?.EnergyR ?? 0,
+                G = user?.EnergyG ?? 0,
+                B = user?.EnergyB ?? 0,
+            },
+        };
+    }
+
+    private static (int r, int g, int b) ParseColor(string hex)
+    {
+        // #FF6B6B → (25, 10, 10) 归一化能量增量
+        var value = Convert.ToInt32(hex.TrimStart('#'), 16);
+        return (
+            ((value >> 16) & 255) / 10,
+            ((value >> 8) & 255) / 10,
+            (value & 255) / 10
+        );
+    }
 }
 ```
 
@@ -276,606 +712,253 @@ exports.main = async (event, context) => {
 #### 分支策略
 
 ```
-main         ← 稳定版本，可演示
-  └── dev    ← 开发分支，所有人合并到此
-       ├── feat/camera        ← A 前端的特性分支
-       ├── feat/ai-analyze    ← B 算法的特性分支
-       ├── feat/user-api      ← C 后端的特性分支
-       └── docs/readme        ← D 产品的文档分支
+main                  ← 稳定版本，可演示
+  └── dev             ← 开发分支
+       ├── feat/photo-upload          ← 前端 A
+       ├── feat/ai-integration        ← 网关 B
+       ├── feat/photo-api             ← 后端 C
+       └── docs/poster                ← 产品 D
 ```
 
 #### Commit 规范
 
 ```
-<type>: <简短中文描述>
+<type>(<scope>): <简短中文描述>
 
-# type 类型
-feat:    新功能
-fix:     修复 Bug
-docs:    文档变更
-refactor: 重构
-style:   代码格式（不影响功能）
-chore:   构建/配置变更
+scope 示例：frontend / gateway / backend / docs
+type: feat / fix / docs / refactor / style / chore
 ```
 
 示例：
 ```
-feat: 拍照后调用 AI 分析并展示评分卡片
-fix: 能量槽满后进化按钮未及时亮起
-docs: 更新 API 接口文档
-```
-
-#### 提交流程
-
-```
-1. git pull origin dev          # 拉取最新代码
-2. git checkout -b feat/xxx     # 创建特性分支
-3. [写代码]
-4. git add <文件>                # 按文件添加，不用 git add .
-5. git commit -m "feat: xxx"    # 写规范的 commit message
-6. git push origin feat/xxx     # 推送
-7. → PR → 至少 1 人 Review → 合入 dev
+feat(frontend): 拍照页集成相机 API
+feat(gateway): 对接 GPT-4V 分析接口
+feat(backend): 实现照片 CRUD 接口
+fix(gateway): AI 超时后未正确降级到兜底评分
 ```
 
 #### Code Review 要点
 
-- 检查是否有**硬编码**（token、URL 等）
-- 检查**异常处理**是否遗漏（API 失败、用户取消、权限拒绝）
-- 检查**命名**是否符合规范
-- 检查是否有**未使用的变量或 import**
+- **跨语言接口**：FastAPI 的返回格式与 C# DTO 是否对齐
+- **错误传播**：C# 的错误是否被 FastAPI 正确捕获并返回给前端
+- **类型安全**：TypeScript 类型与 Pydantic 模型是否一致
+- **配置泄漏**：API Key、连接串等是否已提取到环境变量
 
 ---
 
 ## 4. 突发预警策略
 
-### 4.1 风险分级响应
+### 4.1 风险分级
 
-| 级别 | 定义 | 响应措施 |
-|------|------|----------|
-| 🔴 **P0 致命** | 核心闭环断裂（拍照→评分→小人无反馈） | 全员暂停手头工作，集中修复 |
-| 🟡 **P1 严重** | 某核心功能不可用（任务/图鉴/地图） | 负责人 + 1 人协助，2h 内解决 |
-| 🟢 **P2 一般** | 体验问题（动画卡顿、文案错误） | 记录到 issue，排在核心功能后修复 |
+| 级别 | 定义 | 响应 |
+|------|------|------|
+| **P0** | 前端 → FastAPI → C# 全链路不通 | 全员暂停，集中修复 |
+| **P1** | 某个模块功能不可用 | 负责人 + 1 人协助，2h 内解决 |
+| **P2** | 体验/视觉问题 | 记录 issue，优先修 P0/P1 |
 
-### 4.2 典型突发场景与应对
+### 4.2 典型场景
 
-#### 场景 1：视觉 API 超时或不可用 🔴
+| 场景 | 级别 | 应对 |
+|------|------|------|
+| GPT-4V API 超时或 key 失效 | **P0** | FastAPI 自动降级到规则评分，前端无感知 |
+| C# 后端服务 down | **P1** | FastAPI 缓存最近结果，返回 cache 数据 + 标记 `source: cache` |
+| 前端 CORS 配置错误 | **P1** | 检查 `config/gateway/config.dev.yaml` 的 CORS 配置 |
+| 团队联调接口格式对不上 | **P1** | 以 FastAPI 的 Pydantic model 为「接口契约」，C# 和前端都对齐它 |
+| 容器启动失败 | **P2** | 用 `docker compose logs` 查看具体报错 |
 
-```
-表现：拍照后一直 loading，没有评分结果返回
-影响：核心闭环断裂（P0 致命）
-
-响应：
-  1. 云函数设置 8s 超时，超时后自动走兜底规则评分
-  2. 兜底评分只需计算 HSL + 色彩丰富度，不依赖外部 API
-  3. 前端 5s 无返回时展示「AI 思考中」动画，而不是空白
-  
-预防：
-  - B 需在阶段二完成兜底规则评分函数
-  - 上线前测试 API 降级路径
-```
-
-#### 场景 2：图片上传太慢 🟡
+### 4.3 降级策略（核心）
 
 ```
-表现：用户拍照后等待超过 5s 才进入评分
-影响：体验差（P1 严重）
-
-响应：
-  1. 前端拍照后立即在前端压缩图片（720px 宽，80% 质量）
-  2. 压缩后 < 200KB 再上传
-  3. 上传与 AI 分析并行：上传的同时就调用分析接口
-  
-预防：
-  - A 需在拍照功能中内置压缩逻辑
-```
-
-#### 场景 3：评审现场网络不佳 🔴
-
-```
-表现：演示时 API 调不通
-影响：演示失败（P0 致命）
-
-响应：
-  1. 手机本地预存 5 张测试照片（覆盖高/中/低分场景）
-  2. 预存分析结果在本地缓存
-  3. 准备离线演示视频（3 分钟）作为备用方案
-  
-预防：
-  - D 在提交前录制好演示视频
-```
-
-#### 场景 4：成员进度严重滞后 🟡
-
-```
-表现：某成员预估工时超 50% 仍未完成
-影响：影响联调（P1 严重）
-
-响应：
-  1. 该成员立即通报 team，不隐瞒
-  2. PM 判断：砍掉非核心功能 / 调人协助 / 降低实现复杂度
-  3. 如果 A（前端）滞后 → C（后端）协助前端写页面
-  4. 如果 B（AI）滞后 → 切换到纯规则评分
-  5. 如果 C（后端）滞后 → 砍图鉴/地图 API，前端硬编码演示数据
-  6. 如果 D（产品）滞后 → 全员协助海报/文档
-```
-
-#### 场景 5：Git 冲突或代码丢失 🟡
-
-```
-表现：合并时大量冲突或误删代码
-影响：浪费时间（P1 严重）
-
-响应：
-  1. 不要惊慌，不要 git push --force
-  2. 用 git stash / git merge --abort 回退到安全状态
-  3. 通知 team，协商合并策略
-  4. 必要时找熟悉 Git 的人协助
-
-预防：
-  - 每人建自己的特性分支，不在 dev 上直接改
-  - commit 频繁一些，少而精
-```
-
-### 4.3 紧急联系
-
-```
-遇到 P0 问题 → 群里 @所有人 + 电话
-遇到 P1 问题 → 群里 @责任人
-遇到 P2 问题 → 记录 issue，下次迭代修
+GPT-4V 可用 ──→ AI 评分（主路径）
+      ↓ 不可用
+规则评分引擎（兜底）──→ 仍可返回评分结果
+      ↓ 也不可用
+返回缓存数据 + 标记 → 前端展示「上次分析结果」
 ```
 
 ---
 
-## 5. AI 示例参考（规范代码风格）
+## 5. AI 示例参考
 
-> 以下示例供团队成员参考，也作为 AI 辅助编程时提供给 AI 的 prompt，确保 AI 生成风格一致的代码。
+> 以下示例可作为 Prompt 提供给 AI，确保其生成的代码风格与本项目一致。
 
-### 5.1 给 AI 的风格指令
+### 5.1 给 AI 的风格指令模板
 
-```text
-请按照以下风格生成代码：
+```
+请按以下风格生成代码：
 
-- 语言：JavaScript
-- 缩进：2 空格
-- 命名：变量/函数用小驼峰，常量用大写下划线，组件用大驼峰
-- 异步：使用 async/await
-- 分号：行尾加分号
-- 注释：用中文，解释「为什么」而非「是什么」
-- 早返回：条件判断优先早期返回
-- 解构：优先使用解构赋值
-- 字符串：使用单引号
-- 最长单行限制：100 字符
-- 错误处理：try/catch 捕获，错误信息用中文
+项目: ColorPal
+前端 Vue 3 + TypeScript: 使用 Composition API、<script setup>、4 空格缩进
+网关 FastAPI + Python: 使用 async/await、Pydantic v2、httpx
+后端 C# .NET 8: 使用 Controller 模式、依赖注入、EF Core
+
+通用要求:
+- 接口返回值统一格式: { code: 0, data: ..., message: "ok" }
+- 所有外部调用必须有 try/catch
+- 注释用中文，解释为什么而非是什么
+- 配置文件中的敏感信息使用环境变量
 ```
 
-### 5.2 示例：颜色工具类
+### 5.2 示例：类型定义（TypeScript ↔ Pydantic ↔ C# DTO 对齐）
 
-```javascript
-/**
- * 色彩工具函数
- * 提供颜色转换、评分计算等基础能力
- */
-
-// ============ 常量 ============
-const HEX_REGEX = /^#([0-9a-fA-F]{6})$/
-const SCORE_THRESHOLDS = {
-  HIGH: 70,
-  MEDIUM: 40,
-}
-
-// ============ 颜色转换 ============
-
-/**
- * 将 HEX 色值转为 RGB 对象
- * @param {string} hex - 如 '#FF6B6B'
- * @returns {{ r: number, g: number, b: number }}
- */
-const hexToRgb = (hex) => {
-  const match = hex.match(HEX_REGEX)
-  if (!match) return { r: 0, g: 0, b: 0 }
-
-  const value = parseInt(match[1], 16)
-  return {
-    r: (value >> 16) & 255,
-    g: (value >> 8) & 255,
-    b: value & 255,
-  }
-}
-
-/**
- * 将 RGB 转为 HSL 对象
- * HSL 用于计算色彩属性（色调、饱和度、亮度）
- */
-const rgbToHsl = (r, g, b) => {
-  r /= 255
-  g /= 255
-  b /= 255
-
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const delta = max - min
-
-  let h = 0
-  let s = 0
-  const l = (max + min) / 2
-
-  if (delta !== 0) {
-    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min)
-
-    switch (max) {
-      case r: h = ((g - b) / delta + (g < b ? 6 : 0)) * 60; break
-      case g: h = ((b - r) / delta + 2) * 60; break
-      case b: h = ((r - g) / delta + 4) * 60; break
-    }
-  }
-
-  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) }
-}
-
-// ============ 评分计算 ============
-
-/**
- * 基于色彩理论计算分数（兜底方案）
- * AI 不可用时使用此函数
- *
- * @param {number} saturation - 饱和度 0-100
- * @param {number} brightness - 亮度 0-100
- * @param {number} colorCount - 色彩丰富度 0-100
- * @returns {number} 0-100
- */
-const calculateScore = (saturation, brightness, colorCount) => {
-  const SAT_WEIGHT = 0.4
-  const BRI_WEIGHT = 0.3
-  const VAR_WEIGHT = 0.3
-
-  const score = saturation * SAT_WEIGHT
-    + brightness * BRI_WEIGHT
-    + colorCount * VAR_WEIGHT
-
-  return Math.min(100, Math.max(0, Math.round(score)))
-}
-
-/**
- * 获取小人心情状态
- * 基于最近 5 张照片的平均分
- */
-const getPetMood = (averageScore) => {
-  if (averageScore >= SCORE_THRESHOLDS.HIGH) return 'happy'
-  if (averageScore >= SCORE_THRESHOLDS.MEDIUM) return 'neutral'
-  return 'sad'
-}
-
-// ============ 导出 ============
-module.exports = {
-  hexToRgb,
-  rgbToHsl,
-  calculateScore,
-  getPetMood,
+```typescript
+// frontend/src/types/photo.ts — TypeScript
+export interface AnalysisResult {
+  dominantColor: string    // "#FF6B6B"
+  palette: string[]       // ["#FF6B6B", "#4ECDC4", ...]
+  score: number           // 0-100
+  comment: string
+  colorCategory: 'warm' | 'cool' | 'neutral'
+  saturationLevel: 'high' | 'medium' | 'low'
+  brightnessLevel: 'high' | 'medium' | 'low'
 }
 ```
 
-### 5.3 示例：AI 分析云函数
+```python
+# gateway/app/models/photo.py — Pydantic (接口契约)
+from pydantic import BaseModel, Field
+from typing import Literal
 
-```javascript
-/**
- * AI 颜色分析云函数
- *
- * 流程：接收图片 URL → 调用 GPT-4V → 解析结果 → 校验 → 返回
- * 降级：GPT-4V 超时或不可用时 → 走兜底规则评分
- */
 
-const cloud = require('wx-server-sdk')
-cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
-const db = cloud.database()
+class AnalysisResult(BaseModel):
+    dominant_color: str = Field(..., pattern=r"^#[0-9a-fA-F]{6}$")
+    palette: list[str]
+    score: int = Field(..., ge=0, le=100)
+    comment: str
+    color_category: Literal["warm", "cool", "neutral"]
+    saturation_level: Literal["high", "medium", "low"]
+    brightness_level: Literal["high", "medium", "low"]
+```
 
-// 导入 Prompt 模板
-const { SYSTEM_PROMPT, USER_PROMPT } = require('./prompt')
-const { calculateScore } = require('./scoring')
+```csharp
+// backend/Colopal.Api/DTOs/PhotoDto.cs — C# DTO
+namespace Colopal.Api.DTOs;
 
-const TIMEOUT_MS = 8000
+public class AnalysisResultDto
+{
+    public string DominantColor { get; set; } = string.Empty;
+    public List<string> Palette { get; set; } = new();
+    public int Score { get; set; }
+    public string Comment { get; set; } = string.Empty;
+    public string ColorCategory { get; set; } = "neutral";
+    public string SaturationLevel { get; set; } = "medium";
+    public string BrightnessLevel { get; set; } = "medium";
+}
+```
 
-exports.main = async (event, context) => {
-  const { imageUrl } = event
+### 5.3 示例：全链路接口格式
 
-  // 校验入参
-  if (!imageUrl) {
-    return { code: 400, message: '缺少图片 URL' }
-  }
+```typescript
+// 前端调用 FastAPI 的请求/响应格式
+// POST /api/v1/photo/analyze
+
+// Request: multipart/form-data
+//   image: File
+//   lat?: number
+//   lng?: number
+
+// Response:
+{
+  "code": 0,
+  "data": {
+    "photo_id": "p_20260523_001",
+    "analysis": {
+      "dominant_color": "#FF6B6B",
+      "palette": ["#FF6B6B", "#4ECDC4", "#FFE66D"],
+      "score": 78,
+      "comment": "蓝橙互补，配色高级",
+      "color_category": "warm",
+      "saturation_level": "high",
+      "brightness_level": "medium"
+    },
+    "energy_change": { "r": 25, "g": 10, "b": 10 },
+    "task_completed": null
+  },
+  "message": "ok"
+}
+
+// Error Response:
+{
+  "code": 40001,
+  "data": null,
+  "message": "不支持的图片格式，仅支持 JPEG/PNG/WebP"
+}
+```
+
+### 5.4 示例：Vue 页面调用完整流程
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { uploadAndAnalyze } from '@/api/photo'
+import { usePetStore } from '@/stores/pet'
+import { useRouter } from 'vue-router'
+import type { UploadResponse } from '@/api/photo'
+
+const router = useRouter()
+const petStore = usePetStore()
+const isUploading = ref(false)
+
+const handleFileSelected = async (event: Event) => {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  isUploading.value = true
 
   try {
-    // 主路径：调用 AI 分析
-    const aiResult = await callAIWithTimeout(imageUrl, TIMEOUT_MS)
-    const validated = validateAnalysis(aiResult)
-
-    return {
-      code: 0,
-      data: validated,
-      source: 'ai',
-    }
+    const result: UploadResponse = await uploadAndAnalyze(file)
+    // 更新本地状态
+    petStore.updateEnergy(result.energyChange)
+    // 跳转到结果页
+    router.push({
+      name: 'result',
+      query: { photoId: result.photoId },
+    })
   } catch (err) {
-    console.error('[analyzeColor] AI 分析失败，切换到兜底评分:', err.message)
-
-    // 降级路径：规则评分
-    const fallback = await fallbackScoring(imageUrl)
-
-    return {
-      code: 0,
-      data: fallback,
-      source: 'fallback',
-    }
-  }
-}
-
-/**
- * 调用 GPT-4V 分析图片
- * 超时后自动中断
- */
-const callAIWithTimeout = async (imageUrl, timeoutMs) => {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4-vision-preview',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: USER_PROMPT },
-              { type: 'image_url', image_url: { url: imageUrl } },
-            ],
-          },
-        ],
-        max_tokens: 500,
-      }),
-      signal: controller.signal,
-    })
-
-    const json = await response.json()
-    const content = JSON.parse(json.choices[0].message.content)
-    return content
+    console.error('上传失败:', err)
   } finally {
-    clearTimeout(timer)
+    isUploading.value = false
   }
 }
-
-/**
- * 校验 AI 返回结果
- * 确保字段完整、数值合法
- */
-const validateAnalysis = (data) => {
-  const score = typeof data.score === 'number'
-    ? Math.min(100, Math.max(0, Math.round(data.score)))
-    : 50
-
-  const dominantColor = HEX_REGEX.test(data.dominant_color)
-    ? data.dominant_color
-    : '#CCCCCC'
-
-  return {
-    dominant_color: dominantColor,
-    palette: Array.isArray(data.palette) ? data.palette.slice(0, 5) : [],
-    score,
-    comment: data.comment || '色彩分析完成',
-    color_category: ['warm', 'cool', 'neutral'].includes(data.color_category)
-      ? data.color_category
-      : 'neutral',
-    saturation_level: ['high', 'medium', 'low'].includes(data.saturation_level)
-      ? data.saturation_level
-      : 'medium',
-    brightness_level: ['high', 'medium', 'low'].includes(data.brightness_level)
-      ? data.brightness_level
-      : 'medium',
-  }
-}
-```
-
-### 5.4 示例：API 服务封装
-
-```javascript
-/**
- * API 服务封装
- * 统一处理请求、错误、loading 状态
- */
-
-const BASE_URL = 'https://api.colopal.app'
-
-/**
- * 通用请求封装
- * 自动处理错误提示和 loading
- */
-const request = async (options) => {
-  const { url, method = 'GET', data, showLoading = true } = options
-
-  if (showLoading) {
-    wx.showLoading({ title: '加载中...', mask: true })
-  }
-
-  try {
-    const response = await new Promise((resolve, reject) => {
-      wx.request({
-        url: `${BASE_URL}${url}`,
-        method,
-        data,
-        success: resolve,
-        fail: reject,
-        timeout: 10000,
-      })
-    })
-
-    if (response.statusCode !== 200) {
-      throw new Error(`请求失败: ${response.statusCode}`)
-    }
-
-    return response.data
-  } catch (err) {
-    wx.showToast({ title: '网络开小差了', icon: 'none' })
-    throw err
-  } finally {
-    if (showLoading) {
-      wx.hideLoading()
-    }
-  }
-}
-
-// ============ 导出具体 API ============
-
-const uploadPhoto = async (filePath, location) => {
-  const result = await wx.cloud.uploadFile({
-    cloudPath: `photos/${Date.now()}.jpg`,
-    filePath,
-  })
-
-  return request({
-    url: '/photo/analyze',
-    method: 'POST',
-    data: { imageUrl: result.fileID, location },
-  })
-}
-
-const getUserProfile = async () => {
-  return request({ url: '/user/profile' })
-}
-
-const getCurrentTask = async () => {
-  return request({ url: '/tasks/current' })
-}
-
-module.exports = {
-  uploadPhoto,
-  getUserProfile,
-  getCurrentTask,
-}
-```
-
-### 5.5 示例：页面编写规范
-
-```javascript
-// pages/home/home.js
-// 首页：拍照入口 + 小人展示 + 任务气泡
-
-const { uploadPhoto } = require('../../services/photo')
-const { getCurrentTask } = require('../../services/task')
-
-Page({
-  data: {
-    petInfo: null,
-    currentTask: null,
-    isLoading: false,
-  },
-
-  onLoad() {
-    this.loadHomeData()
-  },
-
-  onShow() {
-    // 从其他页面返回时刷新数据
-    if (this.data.petInfo) {
-      this.loadHomeData()
-    }
-  },
-
-  async loadHomeData() {
-    this.setData({ isLoading: true })
-
-    try {
-      const [profile, task] = await Promise.all([
-        getUserProfile(),
-        getCurrentTask(),
-      ])
-
-      this.setData({
-        petInfo: profile.pet,
-        currentTask: task,
-      })
-    } catch (err) {
-      console.error('[home] 加载首页数据失败:', err)
-    } finally {
-      this.setData({ isLoading: false })
-    }
-  },
-
-  // 点击拍照按钮
-  handleTakePhoto() {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['camera', 'album'],
-      success: (res) => this.navigateToResult(res.tempFiles[0].tempFilePath),
-      fail: () => {
-        wx.showToast({ title: '取消拍照', icon: 'none' })
-      },
-    })
-  },
-
-  // 跳转到评分结果页
-  navigateToPhotoResult(tempFilePath) {
-    wx.navigateTo({
-      url: `/pages/result/result?image=${encodeURIComponent(tempFilePath)}`,
-    })
-  },
-})
-```
-
-### 5.6 示例：CSS 规范
-
-```css
-/* 使用统一的间距和颜色变量 */
-page {
-  --color-primary: #FF6B6B;
-  --color-secondary: #4ECDC4;
-  --color-bg: #F8F9FA;
-  --color-text: #333333;
-  --color-text-light: #999999;
-  --spacing-sm: 8rpx;
-  --spacing-md: 16rpx;
-  --spacing-lg: 32rpx;
-  --radius-sm: 8rpx;
-  --radius-md: 16rpx;
-  --radius-lg: 24rpx;
-}
-
-/* 类名用连字符 */
-.pet-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-lg);
-}
-
-.score-value {
-  font-size: 48rpx;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-/* 状态样式用独立类 */
-.is-loading {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.is-hidden {
-  display: none;
-}
+</script>
 ```
 
 ---
 
-## 附录：开发环境准备清单
+## 6. 开发环境启动
 
-- [ ] 安装微信开发者工具
-- [ ] 注册微信小程序 AppID
-- [ ] 开通微信云开发
-- [ ] 申请 OpenAI API Key
-- [ ] 安装 Git 并配置 SSH
-- [ ] 克隆仓库：`git clone <repo-url>`
-- [ ] 安装依赖：`npm install`
-- [ ] 确认云环境 ID 已配置
+### 6.1 前置条件
+
+- Node.js >= 18
+- Python >= 3.11
+- .NET SDK 8.0
+- Docker + Docker Compose（可选）
+
+### 6.2 启动步骤
+
+```bash
+# 1. 启动 C# 后端
+cd backend/Colopal.Api
+dotnet restore
+dotnet run
+
+# 2. 启动 FastAPI 网关
+cd gateway
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# 3. 启动 Vue 前端
+cd frontend
+npm install
+npm run dev
+```
+
+### 6.3 服务端口
+
+| 服务 | 端口 | 地址 |
+|------|------|------|
+| Vue 前端 | 5173 | http://localhost:5173 |
+| FastAPI 网关 | 8000 | http://localhost:8000 |
+| FastAPI Swagger | 8000 | http://localhost:8000/docs |
+| C# 后端 | 5000 | http://localhost:5000 |
+| C# Swagger | 5000 | http://localhost:5000/swagger |
