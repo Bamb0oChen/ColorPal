@@ -1,9 +1,22 @@
 :root {
   --color-primary: #ff6b6b;
   --color-secondary: #4ecdc4;
+  --color-accent: #ffe66d;
   --color-bg: #f8f9fa;
   --color-text: #333;
   --color-text-light: #999;
+  --color-white: #fff;
+  --color-border: #eee;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
 }
 
 * {
@@ -17,4 +30,10 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+}
+
+.page-shell {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: var(--spacing-lg);
 }

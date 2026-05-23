@@ -6,8 +6,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
-    openai_api_key: str = ''
-    database_url: str = 'sqlite+aiosqlite:///./data/colorpal.db'
+    vision_provider: str = 'qwen'
+    vision_api_key: str = ''
+    vision_api_base_url: str = (
+        'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+    )
+    vision_model: str = 'qwen-vl-max'
+    database_url: str = 'sqlite:///./data/colorpal.db'
     cors_allow_origins: str = 'http://localhost:5173'
 
     @property

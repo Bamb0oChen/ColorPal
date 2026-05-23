@@ -6,5 +6,5 @@ export interface HealthResponse {
 }
 
 export const checkHealth = async (): Promise<HealthResponse> => {
-  return http.get('/health')
+  return http.get<HealthResponse>('/health')
 }

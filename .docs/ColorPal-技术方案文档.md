@@ -24,13 +24,13 @@
 │  Axios 调用层                │                      └─────────┼──────────┼──────┘
 └─────────────────────────────┘                                │          │
                                                                ▼          ▼
-                                                         ┌──────────┐ ┌────────────┐
-                                                         │ SQLite   │ │ GPT-4V API │
-                                                         │ (本地文件)│ │ + HSL 兜底 │
-                                                         └──────────┘ └────────────┘
+                                                         ┌──────────┐ ┌──────────────┐
+                                                         │ SQLite   │ │ Qwen/DeepSeek│
+                                                         │ (本地文件)│ │ + HSL 兜底   │
+                                                         └──────────┘ └──────────────┘
 ```
 
-**关键链路**：浏览器 → FastAPI（同进程内完成 AI 调用 + 兜底 + 持久化）→ 返回评分 & 能量变化。所有外部依赖（OpenAI、地图）由后端封装，前端只看一个域名。
+**关键链路**：浏览器 → FastAPI（同进程内完成 AI 调用 + 兜底 + 持久化）→ 返回评分 & 能量变化。所有外部依赖（视觉模型、地图）由后端封装，前端只看一个域名。
 
 ---
 
@@ -42,20 +42,20 @@
 |------|------|------|
 | 前端框架 | Vue 3 + Vite + TypeScript | 团队最熟悉，生态成熟，移动端浏览器兼容好 |
 | 状态管理 | Pinia | Vue 3 官方推荐，类型友好 |
-| 视觉模型 | GPT-4V | 一次调用同时完成颜色提取+评分 |
+| 视觉模型 | Qwen VL / DeepSeek 视觉模型 | 一次调用同时完成颜色提取+评分；默认按 OpenAI-compatible HTTP 形态封装 |
 | 兜底评分 | HSL + Pillow 本地计算 | 不依赖外部网络，AI 失败时秒级返回 |
 | 后端 | FastAPI（Python 3.11） | AI 与持久化同进程，避免跨服务对齐成本 |
 | 数据库 | SQLite + SQLAlchemy 2.0 异步 | 零运维、单文件、可随仓库迁移；上量再换 Postgres |
 | 地图 | Leaflet | 纯前端库、轻量，不需要 token |
-| 小人动画 | Lottie / SVG + CSS 换色 | 轻量，避免复杂的骨骼动画 |
+| 小人动画 | Live2D | 正式 pet 表现层，能量/心情/阶段只作为驱动参数 |
 | 部署 | Docker Compose | 演示当天一行命令拉起前后端 |
 
 ### 2.2 备选方案
 
 | 场景 | 主方案 | 备选方案 | 切换条件 |
 |------|--------|----------|----------|
-| 视觉模型 | GPT-4V | Claude Vision / Gemini Vision | API 成本或响应速度不达标 |
-| 颜色评分 | AI + HSL 兜底 | 纯 HSL 规则 | OpenAI key 不可用 / 完全离线演示 |
+| 视觉模型 | Qwen VL | DeepSeek / DeepSeek-VL / 自部署兼容网关 | API 成本、响应速度或可用额度不达标 |
+| 颜色评分 | AI + HSL 兜底 | 纯 HSL 规则 | 视觉模型 key 不可用 / 完全离线演示 |
 | 数据库 | SQLite | PostgreSQL（Docker 容器） | 需要并发写入或上线长期运行 |
 | 地图 | Leaflet | Mapbox GL JS | 需要矢量瓦片或自定义样式 |
 | 前端形态 | 浏览器 Web App | PWA（manifest + service worker） | 需要「装到桌面」体验 |
@@ -77,11 +77,11 @@
 |------|------|--------|------|
 | 1.1 | 搭建 Vue + Vite + TS 前端工程，跑通 Tab 路由骨架 | 前端 | 可运行的空壳 App |
 | 1.2 | 搭建 FastAPI 工程 + SQLAlchemy + 健康检查接口 | 后端 | `/api/v1/health` 200 |
-| 1.3 | 申请 OpenAI API Key，测试 GPT-4V 单张调用 | 后端/AI | 确认 API 可用 |
+| 1.3 | 申请 Qwen / DeepSeek 视觉模型 Key，测试单张图片调用 | 后端/AI | 确认 API 可用 |
 | 1.4 | 建表（users、photos、collections、tasks）+ 初始迁移脚本 | 后端 | 可用的 SQLite 文件 |
 | 1.5 | docker-compose.yml 一键拉前后端，确认前端能调通后端 | 全员 | 端到端 hello world |
 
-**阶段一完成标志**：`docker compose up` 后，前端能调通 `/api/v1/health`，FastAPI 能成功调一次 GPT-4V，SQLite 表结构齐全。
+**阶段一完成标志**：`docker compose up` 后，前端能调通 `/api/v1/health`，FastAPI 能成功调一次 Qwen / DeepSeek 视觉模型，SQLite 表结构齐全。
 
 ### 阶段二：核心闭环（预估 8 小时）
 
@@ -90,11 +90,11 @@
 | 步骤 | 任务 | 负责人 | 前置依赖 |
 |------|------|--------|----------|
 | 2.1 | 实现 `<input type="file" capture>` 拍照/相册选取 + 客户端压缩 | 前端 | 1.1 |
-| 2.2 | 编写 GPT-4V Prompt，封装 `analyze_image()` 服务 | 后端/AI | 1.3 |
+| 2.2 | 编写视觉模型 Prompt，封装 `analyze_image()` 服务 | 后端/AI | 1.3 |
 | 2.3 | 编写 HSL 兜底评分 `fallback_score()` + Pydantic 后处理校验 | 后端/AI | 2.2 |
 | 2.4 | 实现小人能量更新逻辑（RGB 三维向量 + 心情计算） | 后端 | 1.4 |
 | 2.5 | 前端拍照 → POST /photo/analyze → 评分卡片渲染 | 前端 | 2.1, 2.3 |
-| 2.6 | 前端 PetDisplay 组件（SVG 换色 + 能量条） | 前端 | 2.4 |
+| 2.6 | 前端 PetDisplay 组件（Live2D 模型 + 能量条） | 前端 | 2.4 |
 | 2.7 | 联调：拍照 → API → 评分 → 小人变化 全链路 | 前后端 | 2.5, 2.6 |
 
 **阶段二完成标志**：用户拍照后，完整跑通评分展示 + 小人颜色/心情变化。
@@ -322,7 +322,7 @@ score = (饱和度评分 × 0.4) + (亮度评分 × 0.3) + (色彩丰富度 × 0
   → 前端 canvas 压缩到 720px / 80% 质量
   → POST /api/v1/photo/analyze (multipart/form-data) 到 FastAPI
     → FastAPI 路由层校验图片格式
-    → services/ai_analyzer.analyze_image() 调 GPT-4V (8s 超时)
+    → services/ai_analyzer.analyze_image() 调 Qwen/DeepSeek 视觉模型 (8s 超时)
       ↳ 超时/异常时切换 services/scorer.fallback_score()
     → Pydantic 校验返回值（hex/score 范围）
     → SQLAlchemy 写 photos 表
@@ -333,7 +333,7 @@ score = (饱和度评分 × 0.4) + (亮度评分 × 0.3) + (色彩丰富度 × 0
 
 **时间预算**：
 - 图片上传：1-3s（取决于图片大小，需要做压缩）
-- AI 分析：2-5s（GPT-4V 响应时间）
+- AI 分析：2-5s（Qwen/DeepSeek 视觉模型响应时间）
 - 总耗时：3-8s → 需要 loading 动画
 
 ### 6.2 小人状态管理
@@ -359,6 +359,8 @@ score = (饱和度评分 × 0.4) + (亮度评分 × 0.3) + (色彩丰富度 × 0
   AND 已解锁指定颜色组合
   AND 已完成指定成就
 ```
+
+前端表现层使用 Live2D：`pet.color`、`pet.mood`、`pet.stage`、`energy` 不直接决定 DOM/SVG 形状，而是映射到 Live2D 模型的 tint、motion、expression 与阶段模型资源。MVP 可以先接入一套基础模型，后续逐步替换不同阶段素材。
 
 ### 6.3 任务系统状态机
 
