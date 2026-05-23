@@ -70,6 +70,10 @@ obj/
 uploads/
 temp/
 
+# Database files
+*.db
+*.db-journal
+
 # AI agent context files
 CLAUDE.md
 AGENTS.md

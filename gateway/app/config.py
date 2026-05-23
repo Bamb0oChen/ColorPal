@@ -10,9 +10,6 @@ class Settings(BaseSettings):
     GATEWAY_PORT: int = 8000
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
-    # C# 后端地址
-    BACKEND_BASE_URL: str = "http://localhost:5000"
-
     # OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4-vision-preview"

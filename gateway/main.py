@@ -1,17 +1,14 @@
-"""ColorPal FastAPI 网关入口"""
+"""ColorPal FastAPI 入口"""
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
+from app.database import init_db
 from app.routers import photo, user, task
-from app.core.config import settings
 
-app = FastAPI(
-    title="ColorPal API",
-    description="ColorPal 中间层网关 — 前端入口",
-    version="1.0.0",
-)
+app = FastAPI(title="ColorPal API", description="你的色彩伙伴", version="2.0.0")
 
 # CORS
 app.add_middleware(
@@ -28,8 +25,14 @@ app.include_router(user.router, prefix="/api/v1")
 app.include_router(task.router, prefix="/api/v1")
 
 
+@app.on_event("startup")
+def startup():
+    """应用启动时初始化数据库"""
+    init_db()
+
+
 @app.get("/health")
-async def health():
+def health():
     return {"status": "ok", "service": "colopal-gateway"}
 
 
