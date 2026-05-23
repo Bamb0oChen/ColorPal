@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { UploadResponse } from '@/api/photo'
-import { findClosestColor, type ColorItem } from '@/utils/constants'
+import { findClosestColor, getColorById, type ColorItem } from '@/utils/constants'
 
 const STORAGE_KEY = 'colorpal.palette'
 const LAST_ANALYSIS_KEY = 'colorpal.last-analysis'
@@ -72,6 +72,36 @@ export const usePaletteStore = defineStore('palette', () => {
     localStorage.setItem(LAST_ANALYSIS_KEY, JSON.stringify(lastAnalysis.value))
   }
 
+  /** 按色值命中解锁（Homepage AI 返回 hex 时用） */
+  function addColor(hex: string) {
+    const match = findClosestColor(hex)
+    const colorHex = match?.hex || hex
+    collectedColors.value = [colorHex, ...collectedColors.value.filter((c) => c !== colorHex)].slice(0, 8)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedColors.value))
+
+    if (match && !collectedColorItems.value.some((c) => c.id === match.id)) {
+      if (!unseenCollectionIds.value.includes(match.id)) {
+        unseenCollectionIds.value.push(match.id)
+        localStorage.setItem(COLLECTION_NOTICE_KEY, JSON.stringify(unseenCollectionIds.value))
+      }
+    }
+  }
+
+  /** 按色码 ID 直接解锁 */
+  function unlockColorById(colorId: string) {
+    if (collectedColorItems.value.some((c) => c.id === colorId)) return
+    const match = getColorById(colorId)
+    if (!match) return
+
+    collectedColors.value = [match.hex, ...collectedColors.value.filter((c) => c !== match.hex)].slice(0, 8)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedColors.value))
+
+    if (!unseenCollectionIds.value.includes(match.id)) {
+      unseenCollectionIds.value.push(match.id)
+      localStorage.setItem(COLLECTION_NOTICE_KEY, JSON.stringify(unseenCollectionIds.value))
+    }
+  }
+
   const clearCollectionNotice = () => {
     unseenCollectionIds.value = []
     localStorage.removeItem(COLLECTION_NOTICE_KEY)
@@ -85,6 +115,8 @@ export const usePaletteStore = defineStore('palette', () => {
     hasCollectionNotice,
     unseenCollectionIds,
     addColorFromImageName,
+    addColor,
+    unlockColorById,
     addAnalysisResult,
     clearCollectionNotice,
   }
