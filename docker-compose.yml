@@ -1,16 +1,22 @@
-version: "3.9"
-
 services:
-  gateway:
-    build: ./gateway
+  backend:
+    build:
+      context: ./backend
+    container_name: colorpal-backend
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/colorpal.db
+      - CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8080
+    volumes:
+      - ./backend/data:/app/data
     ports:
       - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=sqlite:///data/colopal.db
-    volumes:
-      - gateway-data:/app/data
 
-volumes:
-  gateway-data:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: colorpal-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
