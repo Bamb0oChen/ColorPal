@@ -1,111 +1,204 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { checkHealth } from '@/api/health'
+import { computed } from 'vue'
+import DesktopDropZone from '@/components/DesktopDropZone.vue'
+import LoginPanel from '@/components/LoginPanel.vue'
+import Live2DCompanion from '@/components/Live2DCompanion.vue'
+import MobileCaptureButton from '@/components/MobileCaptureButton.vue'
+import { useDeviceMode } from '@/composables/useDeviceMode'
+import { usePaletteStore } from '@/stores/palette'
+import { useSessionStore } from '@/stores/session'
 
-type Status = 'pending' | 'ok' | 'fail'
+const sessionStore = useSessionStore()
+const paletteStore = usePaletteStore()
+const { isMobile } = useDeviceMode()
 
-const status = ref<Status>('pending')
-const serviceName = ref('')
-const errorMessage = ref('')
+const pageStyle = computed(() => ({
+  '--accent-color': paletteStore.accentColor,
+}))
 
-const probe = async () => {
-  status.value = 'pending'
-  errorMessage.value = ''
-  try {
-    const result = await checkHealth()
-    serviceName.value = result.service
-    status.value = result.status === 'ok' ? 'ok' : 'fail'
-  } catch (err) {
-    status.value = 'fail'
-    errorMessage.value = err instanceof Error ? err.message : String(err)
-  }
+const handleImageSelected = (file: File) => {
+  paletteStore.addColorFromImageName(file.name)
 }
-
-onMounted(probe)
 </script>
 
 <template>
-  <main class="hello">
-    <h1>ColorPal</h1>
-    <p class="tagline">喂它颜色，陪它成长，用新的方式看世界</p>
+  <main class="app-shell" :style="pageStyle">
+    <div class="wash wash-one" />
+    <div class="wash wash-two" />
 
-    <section class="health-card" :data-status="status">
-      <h2>后端连通性</h2>
-      <p v-if="status === 'pending'">检测中…</p>
-      <p v-else-if="status === 'ok'">
-        ✓ 已连接 <code>{{ serviceName }}</code>
-      </p>
-      <p v-else>
-        ✗ 后端不可达
-        <span v-if="errorMessage">：{{ errorMessage }}</span>
-      </p>
-      <button type="button" @click="probe">重新检测</button>
+    <section v-if="!sessionStore.isLoggedIn" class="login-layout">
+      <LoginPanel />
+      <Live2DCompanion :accent-color="paletteStore.accentColor" />
     </section>
 
-    <p class="hint">这是脚手架页面，业务功能尚未实现。</p>
+    <section v-else class="home-layout">
+      <header class="topbar">
+        <div>
+          <p class="brand">ColorPal</p>
+          <p class="welcome">Hi, {{ sessionStore.session?.display_name }}</p>
+        </div>
+        <button type="button" class="ghost-button" @click="sessionStore.logout">退出</button>
+      </header>
+
+      <div class="stage">
+        <div class="palette-strip" aria-label="已收集颜色">
+          <span
+            v-for="color in paletteStore.collectedColors"
+            :key="color"
+            class="swatch"
+            :style="{ backgroundColor: color }"
+          />
+        </div>
+
+        <Live2DCompanion :accent-color="paletteStore.accentColor" mood="happy" />
+
+        <DesktopDropZone v-if="!isMobile" @image-selected="handleImageSelected" />
+        <div v-else class="mobile-action">
+          <MobileCaptureButton @image-selected="handleImageSelected" />
+        </div>
+      </div>
+    </section>
   </main>
 </template>
 
 <style scoped>
-.hello {
-  max-width: 480px;
-  margin: 60px auto;
-  padding: 24px;
-  font-family: -apple-system, 'Helvetica Neue', sans-serif;
-  text-align: center;
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.98)),
+    color-mix(in srgb, var(--accent-color), white 88%);
+  color: #202020;
 }
 
-h1 {
-  font-size: 48px;
-  margin: 0 0 8px;
-  color: #ff6b6b;
+.wash {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-color), transparent 76%);
+  filter: blur(52px);
 }
 
-.tagline {
-  color: #888;
-  margin-bottom: 32px;
+.wash-one {
+  top: -90px;
+  right: -80px;
+  width: 280px;
+  height: 280px;
 }
 
-.health-card {
-  padding: 24px;
-  border-radius: 16px;
-  background: #f8f9fa;
-  text-align: left;
+.wash-two {
+  left: -120px;
+  bottom: -130px;
+  width: 320px;
+  height: 320px;
+  opacity: 0.42;
 }
 
-.health-card[data-status='ok'] {
-  background: #e8f8f5;
+.login-layout,
+.home-layout {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
 }
 
-.health-card[data-status='fail'] {
-  background: #fdeaea;
+.login-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) minmax(220px, 1fr);
+  align-items: center;
+  gap: 72px;
+  width: min(1080px, calc(100vw - 48px));
+  margin: 0 auto;
 }
 
-.health-card h2 {
-  margin-top: 0;
-  font-size: 16px;
+.home-layout {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 26px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.brand,
+.welcome {
+  margin: 0;
+}
+
+.brand {
+  color: var(--accent-color);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.welcome {
+  margin-top: 4px;
+  color: #555;
+}
+
+.ghost-button {
+  min-width: 72px;
+  height: 38px;
+  border: 1px solid rgba(30, 30, 30, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.68);
   color: #333;
-}
-
-code {
-  background: rgba(0, 0, 0, 0.05);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'SF Mono', Menlo, monospace;
-}
-
-button {
-  margin-top: 12px;
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
   cursor: pointer;
 }
 
-.hint {
-  margin-top: 32px;
-  color: #bbb;
-  font-size: 14px;
+.stage {
+  min-height: calc(100vh - 120px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 24px;
+}
+
+.palette-strip {
+  display: inline-flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-action {
+  display: grid;
+  place-items: center;
+  min-height: 126px;
+}
+
+@media (max-width: 760px) {
+  .login-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 28px 0;
+  }
+
+  .login-layout :deep(.companion) {
+    order: -1;
+    justify-self: center;
+  }
+
+  .home-layout {
+    padding: 18px;
+  }
+
+  .stage {
+    min-height: calc(100vh - 104px);
+    gap: 18px;
+  }
 }
 </style>

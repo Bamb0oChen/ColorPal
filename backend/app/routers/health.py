@@ -1,4 +1,4 @@
-"""健康检查端点；前后端联调与容器探活共用。"""
+"""Health check endpoint shared by local dev and containers."""
 
 from fastapi import APIRouter
 

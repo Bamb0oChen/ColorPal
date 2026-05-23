@@ -13,7 +13,7 @@ http.interceptors.response.use(
   (err) => {
     const message = err.response?.data?.detail || '请求失败，请重试'
     console.error('[API Error]', message)
-    return Promise.reject(err)
+    return Promise.reject(new Error(message))
   },
 )
 

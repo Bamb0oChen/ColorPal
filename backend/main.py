@@ -1,15 +1,15 @@
-"""ColorPal FastAPI 入口。"""
+"""ColorPal FastAPI entrypoint."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import health
+from app.routers import auth, health
 
 app = FastAPI(
     title='ColorPal API',
     version='0.1.0',
-    description='ColorPal 后端：AI 颜色分析 + 持久化',
+    description='ColorPal backend for AI color analysis and lightweight auth.',
 )
 
 app.add_middleware(
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix='/api/v1')
+app.include_router(auth.router, prefix='/api/v1')
 
 
 @app.get('/')

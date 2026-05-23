@@ -1,9 +1,10 @@
 :root {
-  --color-primary: #ff6b6b;
-  --color-secondary: #4ecdc4;
-  --color-bg: #f8f9fa;
-  --color-text: #333;
-  --color-text-light: #999;
+  --accent-color: #ff6b6b;
+  --color-bg: #ffffff;
+  --color-text: #202020;
+  --color-muted: #6f6f6f;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 * {
@@ -11,10 +12,27 @@
 }
 
 html,
+body,
+#app {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
-  padding: 0;
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+label:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-color), transparent 70%);
+  outline-offset: 3px;
 }
