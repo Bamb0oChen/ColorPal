@@ -8,6 +8,10 @@ const displayName = ref('Color walker')
 const handleLogin = async () => {
   await sessionStore.loginWithGithubDiscussion(displayName.value)
 }
+
+const handleDevLogin = () => {
+  sessionStore.loginAsDeveloper(displayName.value)
+}
 </script>
 
 <template>
@@ -25,6 +29,8 @@ const handleLogin = async () => {
       <span class="mark">GH</span>
       <span>{{ sessionStore.isLoading ? '正在连接 Discussion' : '通过 GitHub Discussion 登录' }}</span>
     </button>
+
+    <button class="dev-button" type="button" @click="handleDevLogin">开发模式：跳过登录</button>
 
     <p v-if="sessionStore.errorMessage" class="error">{{ sessionStore.errorMessage }}</p>
   </section>
@@ -85,20 +91,31 @@ h1 {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color), transparent 82%);
 }
 
-.login-button {
+.login-button,
+.dev-button {
   width: 100%;
   min-height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border: 0;
   border-radius: 6px;
-  background: #1f2328;
-  color: #fff;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.login-button {
+  border: 0;
+  background: #1f2328;
+  color: #fff;
+}
+
+.dev-button {
+  margin-top: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-color), #cfcfcf 58%);
+  background: color-mix(in srgb, var(--accent-color), white 90%);
+  color: #2b2b2b;
 }
 
 .login-button:disabled {

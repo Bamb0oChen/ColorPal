@@ -7,7 +7,7 @@ export interface DiscussionLoginStart {
 export interface UserSession {
   user_id: string
   display_name: string
-  provider: 'github_discussions'
+  provider: 'github_discussions' | 'developer_bypass'
   discussion_url: string
   created_at: string
 }
