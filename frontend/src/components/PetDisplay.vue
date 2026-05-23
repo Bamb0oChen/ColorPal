@@ -21,7 +21,6 @@ const props = withDefaults(
     event?: PetDisplayEvent
     modelPath?: string
     showStats?: boolean
-    offsetY?: number
   }>(),
   {
     size: 'hero',
@@ -29,7 +28,6 @@ const props = withDefaults(
     event: 'idle',
     modelPath: defaultPetModel,
     showStats: true,
-    offsetY: 0.94,
   },
 )
 
@@ -103,15 +101,6 @@ watch(
   },
 )
 
-watch(
-  () => [props.size, props.showStats, props.pet],
-  () => {
-    if (loadState.value !== 'ready') return
-    nextTick(() => fitModel())
-  },
-  { deep: true },
-)
-
 async function mountLive2d() {
   if (!canvasHost.value) return
 
@@ -177,7 +166,7 @@ function fitModel() {
     scaleMultiplier
   model.value.scale.set(scale)
   model.value.x = width / 2
-  model.value.y = height * (props.showStats ? props.offsetY : 1.08)
+  model.value.y = height * (props.showStats ? 0.84 : 1.08)
 }
 
 async function playEventMotion(event: PetDisplayEvent) {
