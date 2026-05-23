@@ -31,7 +31,5 @@ export const uploadAndAnalyze = async (
     formData.append('lng', String(location.lng))
   }
 
-  return http.post<UploadResponse>('/photo/analyze', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  return http.post<UploadResponse>('/photo/analyze', formData)
 }

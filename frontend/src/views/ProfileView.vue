@@ -30,9 +30,9 @@ const progressPercent = computed(() => Math.round((progress.value.collected / pr
 const stage = computed(() => petStore.stageInfo.stage)
 
 const achievements = computed(() =>
-  ALL_ACHIEVEMENTS.map((achievement, index) => ({
+  ALL_ACHIEVEMENTS.map((achievement) => ({
     ...achievement,
-    unlocked: devMode.value || index < Math.min(ALL_ACHIEVEMENTS.length, Math.floor(progress.value.collected / 2)),
+    unlocked: devMode.value || (achievement.check?.(collectedIds.value) ?? false),
   })),
 )
 
