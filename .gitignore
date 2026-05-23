@@ -1,0 +1,52 @@
+# Visual Studio files
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+.vscode/
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# OS files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Local history
+.localhistory/
+.history/
+
+# SQL Server files
+*.mdf
+*.ldf
+*.ndf
+
+# Node.js
+node_modules/
+
+# Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# AI agent context files
+CLAUDE.md
+AGENTS.md
+AGENT.md
+.claude/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
+.aider*
+.codex/
