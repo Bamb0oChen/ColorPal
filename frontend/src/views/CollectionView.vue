@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import {
   ALL_COLORS,
   ColorFamily,
@@ -33,6 +33,10 @@ const families = computed(() =>
 )
 
 const collectedTotal = computed(() => collectedIds.value.size)
+
+onMounted(() => {
+  paletteStore.clearCollectionNotice()
+})
 </script>
 
 <template>

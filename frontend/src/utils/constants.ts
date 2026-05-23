@@ -171,6 +171,7 @@ export function getColorById(id: string): ColorItem | undefined {
 export function findClosestColor(hex: string): ColorItem | undefined {
   const target = hexToRgb(hex);
   if (!target) return undefined;
+  const targetHsl = rgbToHsl(target.r, target.g, target.b);
 
   let closest: ColorItem | undefined;
   let minDist = Infinity;
@@ -178,7 +179,26 @@ export function findClosestColor(hex: string): ColorItem | undefined {
   for (const color of ALL_COLORS) {
     const rgb = hexToRgb(color.hex);
     if (!rgb) continue;
-    const dist = colorDistance(target, rgb);
+    if (target.r === rgb.r && target.g === rgb.g && target.b === rgb.b) return color;
+
+    const colorHsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const hueDist = hueDistance(targetHsl.h, colorHsl.h) / 180;
+    const satDist = Math.abs(targetHsl.s - colorHsl.s);
+    const lightDist = Math.abs(targetHsl.l - colorHsl.l);
+    const rgbDist = colorDistance(target, rgb) / 441.68;
+    let dist = hueDist * 3 + satDist * 0.85 + lightDist * 0.55 + rgbDist * 0.35;
+    const targetFamily = inferColorFamily(targetHsl.h, targetHsl.s);
+
+    if (targetHsl.s > 0.16 && color.family === ColorFamily.GRAY) {
+      dist += 1.2;
+    }
+    if (targetHsl.s < 0.12 && color.family !== ColorFamily.GRAY) {
+      dist += 0.5;
+    }
+    if (targetFamily && color.family !== targetFamily) {
+      dist += 0.22;
+    }
+
     if (dist < minDist) {
       minDist = dist;
       closest = color;
@@ -264,6 +284,51 @@ function colorDistance(
   b: { r: number; g: number; b: number },
 ): number {
   return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
+}
+
+function rgbToHsl(
+  r: number,
+  g: number,
+  b: number,
+): { h: number; s: number; l: number } {
+  const red = r / 255;
+  const green = g / 255;
+  const blue = b / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const l = (max + min) / 2;
+
+  if (max === min) return { h: 0, s: 0, l };
+
+  const delta = max - min;
+  const s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  let h = 0;
+
+  if (max === red) {
+    h = (green - blue) / delta + (green < blue ? 6 : 0);
+  } else if (max === green) {
+    h = (blue - red) / delta + 2;
+  } else {
+    h = (red - green) / delta + 4;
+  }
+
+  return { h: h * 60, s, l };
+}
+
+function hueDistance(left: number, right: number): number {
+  const distance = Math.abs(left - right) % 360;
+  return Math.min(distance, 360 - distance);
+}
+
+function inferColorFamily(hue: number, saturation: number): ColorFamily | null {
+  if (saturation < 0.12) return ColorFamily.GRAY;
+  if (hue < 15 || hue >= 330) return ColorFamily.RED;
+  if (hue < 45) return ColorFamily.ORANGE;
+  if (hue < 70) return ColorFamily.YELLOW;
+  if (hue < 170) return ColorFamily.GREEN;
+  if (hue < 255) return ColorFamily.BLUE;
+  if (hue < 330) return ColorFamily.PURPLE;
+  return null;
 }
 
 // ============================================================
