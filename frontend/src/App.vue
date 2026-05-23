@@ -16,6 +16,8 @@ let touchStartY = 0
 const navItems = [
   { label: '主页', name: 'home' },
   { label: '图鉴', name: 'collection' },
+  { label: '地图', name: 'map' },
+  { label: '社区', name: 'community' },
   { label: '我的', name: 'profile' },
 ]
 
