@@ -3,26 +3,44 @@ node_modules/
 .pnp
 .pnp.js
 
-# Build
+# Build outputs
 dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment and logs
 .env
 .env.local
 *.log
 
-# IDE
+# IDE and editor
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
 *~
+*.user
+*.userosscache
+*.userprefs
+*.suo
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Local history
+.localhistory/
+.history/
 
 # Python
 __pycache__/
@@ -35,9 +53,30 @@ venv/
 # .NET
 bin/
 obj/
-*.user
-*.suo
 
-# Uploads
+# SQL Server files
+*.mdf
+*.ldf
+*.ndf
+
+# Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Uploads and temp files
 uploads/
 temp/
+
+# AI agent context files
+CLAUDE.md
+AGENTS.md
+AGENT.md
+.claude/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
+.aider*
+.codex/
