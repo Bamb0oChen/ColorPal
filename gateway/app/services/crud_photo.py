@@ -75,6 +75,7 @@ def save_photo(
             "g": user.energy_g if user else 0,
             "b": user.energy_b if user else 0,
             "total": user.energy_current if user else 0,
+            "pet_mood": user.pet_mood if user else "neutral",
         },
     }
 

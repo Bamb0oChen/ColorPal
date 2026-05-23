@@ -12,7 +12,13 @@ const http: AxiosInstance = axios.create({
 })
 
 http.interceptors.response.use(
-  (res) => res.data,
+  (res) => {
+    const payload = res.data
+    if (payload && typeof payload === 'object' && 'code' in payload && 'data' in payload) {
+      return payload.data
+    }
+    return payload
+  },
   (err) => {
     const detail = err.response?.data?.detail
     const message = detail || '请求失败，请重试'

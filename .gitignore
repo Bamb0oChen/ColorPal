@@ -78,9 +78,14 @@ temp/
 CLAUDE.md
 AGENTS.md
 AGENT.md
+.agents/
 .claude/
 .cursor/
 .cursorrules
 .github/copilot-instructions.md
 .aider*
 .codex/
+skills-lock.json
+
+# AI generated scratch docs
+docs/deepseek_markdown_*.md
