@@ -28,6 +28,21 @@ const router = createRouter({
       name: 'profile',
       component: () => import('@/views/ProfileView.vue'),
     },
+    {
+      path: '/community',
+      name: 'community',
+      component: () => import('@/views/CommunityView.vue'),
+    },
+    {
+      path: '/community/post',
+      name: 'create-post',
+      component: () => import('@/views/CreatePostView.vue'),
+    },
+    {
+      path: '/community/post/:id',
+      name: 'post-detail',
+      component: () => import('@/views/PostDetailView.vue'),
+    },
   ],
 })
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PetDisplay from '@/components/PetDisplay.vue'
 import {
+  AchievementCategory,
   ALL_ACHIEVEMENTS,
   ALL_COLORS,
   AchievementCategoryColor,
@@ -16,6 +17,7 @@ import { createDemoPet } from '@/utils/demoPet'
 const paletteStore = usePaletteStore()
 const petStore = usePetStore()
 const sessionStore = useSessionStore()
+const devMode = ref(false)
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
 const collectedIds = computed(() => paletteStore.collectedColors.map((color) => color))
@@ -31,7 +33,7 @@ const stage = computed(() => {
 const achievements = computed(() =>
   ALL_ACHIEVEMENTS.map((achievement, index) => ({
     ...achievement,
-    unlocked: index < Math.min(ALL_ACHIEVEMENTS.length, Math.floor(progress.value.collected / 2)),
+    unlocked: devMode.value || index < Math.min(ALL_ACHIEVEMENTS.length, Math.floor(progress.value.collected / 2)),
   })),
 )
 
@@ -109,22 +111,52 @@ onMounted(async () => {
     <section class="achievement-panel">
       <div class="panel-header">
         <h2>成就</h2>
-        <span>{{ unlockedCount }}/{{ ALL_ACHIEVEMENTS.length }}</span>
+        <div class="panel-header-right">
+          <span>{{ unlockedCount }}/{{ ALL_ACHIEVEMENTS.length }}</span>
+          <button
+            class="dev-button"
+            :class="{ active: devMode }"
+            title="开发者模式：解锁全部成就"
+            @click="devMode = !devMode"
+          >
+            Dev
+          </button>
+        </div>
       </div>
+      <div v-if="devMode" class="dev-banner">开发者模式 — 所有成就已解锁（仅前端展示）</div>
 
       <div class="achievement-list">
         <article
           v-for="item in achievements"
           :key="item.id"
           class="achievement-card"
-          :class="{ unlocked: item.unlocked }"
+          :class="{
+            unlocked: item.unlocked,
+            locked: !item.unlocked && (item.category === AchievementCategory.RARITY || item.category === AchievementCategory.COMBO),
+          }"
         >
-          <span class="achievement-mark" :style="{ backgroundColor: AchievementCategoryColor[item.category] }" />
-          <div>
-            <strong>{{ item.name }}</strong>
-            <p>{{ item.description }}</p>
+          <div class="achievement-card-inner">
+            <span
+              class="achievement-mark"
+              :style="{
+                background: item.swatch || AchievementCategoryColor[item.category],
+              }"
+            />
+            <div>
+              <strong>{{ item.unlocked ? item.name : '???' }}</strong>
+              <p>{{ item.unlocked ? item.description : '未解锁' }}</p>
+            </div>
+            <small>{{ AchievementCategoryLabel[item.category] }}</small>
           </div>
-          <small>{{ AchievementCategoryLabel[item.category] }}</small>
+          <div
+            v-if="!item.unlocked && (item.category === AchievementCategory.RARITY || item.category === AchievementCategory.COMBO)"
+            class="ach-lock-mask"
+          >
+            <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
         </article>
       </div>
     </section>
@@ -227,9 +259,44 @@ h1 {
   font-size: 22px;
 }
 
-.panel-header span {
+.panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-header-right span {
   color: var(--accent-color, #ff6b6b);
   font-weight: 850;
+}
+
+.dev-button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(20, 20, 20, 0.1);
+  border-radius: 6px;
+  background: #fff;
+  color: #888;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+.dev-button.active {
+  border-color: #ff6b6b;
+  background: #ff6b6b;
+  color: #fff;
+}
+
+.dev-banner {
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .progress-track {
@@ -254,16 +321,14 @@ h1 {
 }
 
 .achievement-card {
-  display: grid;
-  grid-template-columns: 12px 1fr auto;
-  align-items: center;
-  gap: 12px;
+  position: relative;
   min-height: 84px;
   padding: 14px;
   border: 1px solid rgba(20, 20, 20, 0.08);
   border-radius: 8px;
   background: rgba(250, 250, 250, 0.72);
   opacity: 0.58;
+  overflow: hidden;
 }
 
 .achievement-card.unlocked {
@@ -272,10 +337,39 @@ h1 {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
+.achievement-card.locked {
+  border-color: rgba(20, 20, 20, 0.15);
+}
+
+.achievement-card-inner {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.ach-lock-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.achievement-card .lock-icon {
+  width: 22px;
+  height: 22px;
+  color: #aaa;
+}
+
 .achievement-mark {
-  width: 12px;
-  height: 48px;
-  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(20, 20, 20, 0.08);
 }
 
 .achievement-card strong {
@@ -317,11 +411,11 @@ h1 {
     grid-template-columns: 1fr 1fr;
   }
 
-  .achievement-card {
-    grid-template-columns: 10px 1fr;
+  .achievement-card-inner {
+    grid-template-columns: 32px 1fr;
   }
 
-  .achievement-card small {
+  .achievement-card-inner small {
     grid-column: 2;
     justify-self: start;
   }

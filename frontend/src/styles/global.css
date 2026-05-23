@@ -18,6 +18,21 @@
   --radius-md: 12px;
   --radius-lg: 20px;
 
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  --gradient-primary: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
+  --gradient-secondary: linear-gradient(135deg, #4ecdc4 0%, #45b7d1 100%);
+
+  /* ChatSpace 兼容别名 */
+  --primary-color: var(--color-primary);
+  --secondary-color: var(--color-secondary);
+  --bg-color: var(--color-bg);
+  --text-color: var(--color-text);
+  --text-light: var(--color-text-light);
+  --border-color: var(--color-border);
+
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
