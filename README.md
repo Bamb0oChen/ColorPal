@@ -5,7 +5,7 @@
 ## 架构
 
 ```
-Vue 3 (Web App) --HTTP--> FastAPI (AI + 持久化) --> GPT-4V / HSL 兜底
+Vue 3 (Web App) --HTTP--> FastAPI (AI + 持久化) --> Qwen/DeepSeek / HSL 兜底
                                             └----> SQLite
 ```
 
@@ -22,7 +22,7 @@ Vue + FastAPI 两层架构。详细背景与决策见 `.docs/`：
 
 ```bash
 cp .env.example .env
-# 把 OPENAI_API_KEY 填上；想暂时只跑兜底评分可以留空
+# 把 VISION_API_KEY 填上；想暂时只跑兜底评分可以留空
 ```
 
 ### Docker 一键启动
@@ -75,3 +75,8 @@ npm run dev
 - `GET /api/v1/photo/map-points` - 地图彩色点位
 - `GET /api/v1/user/profile` - 用户与小人状态
 - `GET /api/v1/task/current` / `POST /api/v1/task/generate` - MVP 任务骨架
+
+## 两个技术口径
+
+- Pet 表现层最终用 Live2D 实现，能量、心情、进化阶段只作为驱动参数，不再用 SVG/Lottie 作为正式方案。
+- 图像识别主路径使用 Qwen / DeepSeek 视觉模型；后端保留 OpenAI-compatible HTTP 调用形态，方便在 Qwen 云 API、DeepSeek / DeepSeek-VL 自部署或其他兼容网关之间切换。

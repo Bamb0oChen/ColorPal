@@ -4,8 +4,10 @@ services:
       context: ./backend
     container_name: colorpal-backend
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4-vision-preview}
+      - VISION_PROVIDER=${VISION_PROVIDER:-qwen}
+      - VISION_API_KEY=${VISION_API_KEY:-}
+      - VISION_API_BASE_URL=${VISION_API_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions}
+      - VISION_MODEL=${VISION_MODEL:-qwen-vl-max}
       - DATABASE_URL=sqlite:////app/data/colorpal.db
       - CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8080
     volumes:

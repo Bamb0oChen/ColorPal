@@ -21,7 +21,7 @@
 | 角色 | 人员 | 主责领域 | 涉及代码/产出 |
 |------|------|----------|---------------|
 | **A · 前端开发** | 成员 1 | Vue 3 前端、相机/上传、小人动画、海报视觉素材产出 | `frontend/` 全部 |
-| **B · 算法/AI** | 成员 2 | GPT-4V 集成、Prompt、HSL 兜底评分、任务匹配规则 | `backend/app/services/` 下 AI/scoring/task_matcher 模块 |
+| **B · 算法/AI** | 成员 2 | Qwen/DeepSeek 视觉模型集成、Prompt、HSL 兜底评分、任务匹配规则 | `backend/app/services/` 下 AI/scoring/task_matcher 模块 |
 | **C · 后端开发** | 成员 3 | FastAPI 路由层、SQLAlchemy 模型、用户/照片/任务/图鉴持久化 | `backend/app/{routers,models,schemas,db.py}` |
 | **D · 产品/设计** | 成员 4 | 产品文档、路演海报、演示视频、GitHub、团队协调 | 文档、海报设计稿、PRD |
 
@@ -39,7 +39,7 @@
 | 拍照/相册选取（`<input capture>` + 文件读取） | 1.5h | — | 相机调用 + 图片选取 |
 | 图片 canvas 压缩 + multipart 上传到 FastAPI | 1h | — | 上传函数 |
 | 评分结果展示卡片（分数 + 调色板 + 评语） | 2h | B 提供 API | 评分 UI 组件 |
-| 小人展示组件（基础形态 + 换色 + 能量条 + 心情） | 2.5h | — | 小人 SVG/Lottie 组件 |
+| 小人展示组件（Live2D 模型 + 能量条 + 心情） | 2.5h | — | PetDisplay Live2D 组件 |
 | 任务气泡 UI + 任务完成反馈动画 | 1.5h | C 提供 API | 任务 UI 组件 |
 | 图鉴页面（颜色网格 + 分类标签） | 1.5h | C 提供 API | 图鉴页面 |
 | 地图页面（彩色标记点展示） | 1.5h | C 提供 API | 地图页面 |
@@ -55,7 +55,7 @@
 
 | 任务 | 预估工时 | 前置依赖 | 产出 |
 |------|----------|----------|------|
-| 申请 OpenAI API Key + 单张图片调用测试 | 1h | — | API 可用确认 |
+| 申请 Qwen / DeepSeek 视觉模型 Key + 单张图片调用测试 | 1h | — | API 可用确认 |
 | 编写 Prompt（颜色提取 + 评分 + 评价） | 2h | — | Prompt 模板 v1 |
 | 实现 `services/ai_analyzer.analyze_image()` + httpx 异步调用 | 2h | 1,2 | AI 服务模块 |
 | 实现 `services/scorer.fallback_score()`（Pillow + HSL） | 1h | — | 兜底评分模块 |

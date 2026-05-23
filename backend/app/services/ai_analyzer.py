@@ -1,4 +1,4 @@
-"""AI 视觉分析服务（主路径调用 GPT-4V，兜底走规则评分）。"""
+"""AI 视觉分析服务（主路径调用 Qwen/DeepSeek，兜底走规则评分）。"""
 
 import base64
 import json
@@ -32,30 +32,30 @@ TIMEOUT = 8
 
 
 async def analyze_image(image_bytes: bytes) -> dict:
-    """主路径：GPT-4V 分析，失败则降级到规则评分。"""
+    """主路径：视觉模型分析，失败则降级到规则评分。"""
     try:
-        return await _call_gpt4v(image_bytes)
+        return await _call_vision_model(image_bytes)
     except Exception as err:
-        logger.warning('GPT-4V 失败，降级到规则评分: %s', err)
+        logger.warning('视觉模型失败，降级到规则评分: %s', err)
         return fallback_score(image_bytes)
 
 
-async def _call_gpt4v(image_bytes: bytes) -> dict:
-    """调用 OpenAI GPT-4V。"""
-    if not settings.openai_api_key:
-        raise ValueError('OPENAI_API_KEY 未配置')
+async def _call_vision_model(image_bytes: bytes) -> dict:
+    """调用 OpenAI-compatible 视觉模型接口。"""
+    if not settings.vision_api_key:
+        raise ValueError('VISION_API_KEY 未配置')
 
     b64 = base64.b64encode(image_bytes).decode()
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         resp = await client.post(
-            'https://api.openai.com/v1/chat/completions',
+            settings.vision_api_base_url,
             headers={
-                'Authorization': f'Bearer {settings.openai_api_key}',
+                'Authorization': f'Bearer {settings.vision_api_key}',
                 'Content-Type': 'application/json',
             },
             json={
-                'model': settings.openai_model,
+                'model': settings.vision_model,
                 'messages': [
                     {'role': 'system', 'content': SYSTEM_PROMPT},
                     {
