@@ -1,39 +1,36 @@
 # ColorPal 技术方案文档
 
 > **项目代号**：ColorPal
-> **版本**：v1.0
+> **版本**：v2.0（两层架构）
 > **日期**：2026.05
 > **目标**：25 小时 MVP 开发
 > **受众**：开发团队
+
+> 详细的代码规范、目录结构、命名约定见同级 [技术开发规范文档](./ColorPal-技术开发规范文档.md)。
 
 ---
 
 ## 1. 系统架构总览
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    客户端 (小程序 / Web App)              │
-│  ┌──────────┐  ┌──────────┐  ┌────────┐  ┌──────────┐  │
-│  │ 拍照/相册 │  │ 小人展示 │  │ 地图页 │  │ 图鉴/成就 │  │
-│  └─────┬────┘  └─────┬────┘  └────┬───┘  └─────┬────┘  │
-│        │              │            │             │       │
-│  ┌─────┴──────────────┴────────────┴─────────────┴────┐  │
-│  │                  API 调用层                         │  │
-│  └─────┬──────────────┬────────────┬──────────────────┘  │
-└────────┼──────────────┼────────────┼──────────────────────┘
-         │              │            │
-    ┌────┴────┐    ┌────┴────┐  ┌───┴────┐
-    │ 用户服务 │    │ AI 服务  │  │ 数据服务 │
-    │ (状态/   │    │ (视觉/   │  │ (存储/   │
-    │  任务/   │    │  评分/   │  │  查询)   │
-    │  成就)   │    │  生成)   │  │         │
-    └────┬────┘    └────┬────┘  └───┬────┘
-         └──────────────┴────────────┘
-                    │
-              ┌─────┴──────┐
-              │  数据库/云存储 │
-              └────────────┘
+┌─────────────────────────────┐         HTTP         ┌────────────────────────────┐
+│  Vue 3 前端 (Web App)        │ ──────────────────→  │  FastAPI 后端              │
+│  ┌────────┐ ┌────────┐      │                      │  ┌──────────┐ ┌─────────┐ │
+│  │拍照/相册│ │小人展示│      │ ←──────────────────  │  │路由层    │ │业务服务 │ │
+│  └────────┘ └────────┘      │                      │  └──────────┘ └────┬────┘ │
+│  ┌────────┐ ┌────────┐      │                      │  ┌──────────────┐  │      │
+│  │地图页  │ │图鉴/成就│      │                      │  │SQLAlchemy ORM│  │      │
+│  └────────┘ └────────┘      │                      │  └──────┬───────┘  │      │
+│  Axios 调用层                │                      └─────────┼──────────┼──────┘
+└─────────────────────────────┘                                │          │
+                                                               ▼          ▼
+                                                         ┌──────────┐ ┌────────────┐
+                                                         │ SQLite   │ │ GPT-4V API │
+                                                         │ (本地文件)│ │ + HSL 兜底 │
+                                                         └──────────┘ └────────────┘
 ```
+
+**关键链路**：浏览器 → FastAPI（同进程内完成 AI 调用 + 兜底 + 持久化）→ 返回评分 & 能量变化。所有外部依赖（OpenAI、地图）由后端封装，前端只看一个域名。
 
 ---
 
@@ -43,21 +40,25 @@
 
 | 层次 | 方案 | 理由 |
 |------|------|------|
-| 前端框架 | 微信小程序 / Web App（PWA） | 小程序生态便于分享传播 |
-| 视觉模型 | GPT-4V / Claude Vision API | 一次调用同时完成颜色提取+评分 |
-| 后端 | 云函数（微信云开发 / Vercel Serverless） | 无需自建服务器，快速部署 |
-| 数据库 | 云数据库（MongoDB / 微信云数据库） | 灵活 schema，适合 MVP 快速迭代 |
-| 地图 | 微信内置地图 / Mapbox GL JS | 基础标记点功能即可满足需求 |
-| 小人动画 | Lottie 或 SVG + CSS 换色 | 轻量，避免复杂的骨骼动画 |
+| 前端框架 | Vue 3 + Vite + TypeScript | 团队最熟悉，生态成熟，移动端浏览器兼容好 |
+| 状态管理 | Pinia | Vue 3 官方推荐，类型友好 |
+| 视觉模型 | GPT-4V | 一次调用同时完成颜色提取+评分 |
+| 兜底评分 | HSL + Pillow 本地计算 | 不依赖外部网络，AI 失败时秒级返回 |
+| 后端 | FastAPI（Python 3.11） | AI 与持久化同进程，避免跨服务对齐成本 |
+| 数据库 | SQLite + SQLAlchemy 2.0 异步 | 零运维、单文件、可随仓库迁移；上量再换 Postgres |
+| 地图 | Leaflet | 纯前端库、轻量，不需要 token |
+| 小人动画 | Lottie / SVG + CSS 换色 | 轻量，避免复杂的骨骼动画 |
+| 部署 | Docker Compose | 演示当天一行命令拉起前后端 |
 
 ### 2.2 备选方案
 
 | 场景 | 主方案 | 备选方案 | 切换条件 |
 |------|--------|----------|----------|
-| 视觉模型 | GPT-4V | Claude Vision 或 Gemini Vision | API 成本/响应速度不达标 |
-| 颜色评分 | AI 模型 + 规则 | 纯规则（基于 HSL 公式） | API 调用成本过高 |
-| 地图 | 微信内置地图 | Leaflet / Mapbox | 跨平台需求 |
-| 后端 | 云函数 | FastAPI + Docker | 需要更复杂的业务逻辑 |
+| 视觉模型 | GPT-4V | Claude Vision / Gemini Vision | API 成本或响应速度不达标 |
+| 颜色评分 | AI + HSL 兜底 | 纯 HSL 规则 | OpenAI key 不可用 / 完全离线演示 |
+| 数据库 | SQLite | PostgreSQL（Docker 容器） | 需要并发写入或上线长期运行 |
+| 地图 | Leaflet | Mapbox GL JS | 需要矢量瓦片或自定义样式 |
+| 前端形态 | 浏览器 Web App | PWA（manifest + service worker） | 需要「装到桌面」体验 |
 
 ---
 
@@ -74,13 +75,13 @@
 
 | 步骤 | 任务 | 负责人 | 产出 |
 |------|------|--------|------|
-| 1.1 | 搭建前端项目框架（小程序/PWA） | 前端 | 可运行的空壳 App |
-| 1.2 | 配置云开发/Serverless 环境 | 后端 | 可调用的云函数 |
-| 1.3 | 申请视觉模型 API Key，测试单张图片调用 | 后端/AI | 确认 API 可用 |
-| 1.4 | 设计数据库表结构（用户表、照片表） | 后端 | 数据模型文档 + 建表 |
-| 1.5 | 搭建基础 UI 框架（Tab 页：首页、地图、图鉴、我的） | 前端 | 4 个 Tab 页骨架 |
+| 1.1 | 搭建 Vue + Vite + TS 前端工程，跑通 Tab 路由骨架 | 前端 | 可运行的空壳 App |
+| 1.2 | 搭建 FastAPI 工程 + SQLAlchemy + 健康检查接口 | 后端 | `/api/v1/health` 200 |
+| 1.3 | 申请 OpenAI API Key，测试 GPT-4V 单张调用 | 后端/AI | 确认 API 可用 |
+| 1.4 | 建表（users、photos、collections、tasks）+ 初始迁移脚本 | 后端 | 可用的 SQLite 文件 |
+| 1.5 | docker-compose.yml 一键拉前后端，确认前端能调通后端 | 全员 | 端到端 hello world |
 
-**阶段一完成标志**：前端能调通云函数，云函数能调通视觉 API，返回结果在前端展示。
+**阶段一完成标志**：`docker compose up` 后，前端能调通 `/api/v1/health`，FastAPI 能成功调一次 GPT-4V，SQLite 表结构齐全。
 
 ### 阶段二：核心闭环（预估 8 小时）
 
@@ -88,12 +89,12 @@
 
 | 步骤 | 任务 | 负责人 | 前置依赖 |
 |------|------|--------|----------|
-| 2.1 | 实现拍照/相册选择功能 | 前端 | 1.1 |
-| 2.2 | 编写视觉模型 Prompt，实现颜色提取 + 评分逻辑 | 后端/AI | 1.3 |
-| 2.3 | 编写颜色评分函数（规则层，对 AI 结果做后处理） | 后端/AI | 2.2 |
-| 2.4 | 实现小人状态管理（能量槽 + 外观绑定） | 后端 | 1.4 |
-| 2.5 | 前端实现拍照 → 上传 → 展示评分结果流程 | 前端 | 2.1, 2.3 |
-| 2.6 | 前端实现小人展示组件（基础形态 + 能量条） | 前端 | 2.4 |
+| 2.1 | 实现 `<input type="file" capture>` 拍照/相册选取 + 客户端压缩 | 前端 | 1.1 |
+| 2.2 | 编写 GPT-4V Prompt，封装 `analyze_image()` 服务 | 后端/AI | 1.3 |
+| 2.3 | 编写 HSL 兜底评分 `fallback_score()` + Pydantic 后处理校验 | 后端/AI | 2.2 |
+| 2.4 | 实现小人能量更新逻辑（RGB 三维向量 + 心情计算） | 后端 | 1.4 |
+| 2.5 | 前端拍照 → POST /photo/analyze → 评分卡片渲染 | 前端 | 2.1, 2.3 |
+| 2.6 | 前端 PetDisplay 组件（SVG 换色 + 能量条） | 前端 | 2.4 |
 | 2.7 | 联调：拍照 → API → 评分 → 小人变化 全链路 | 前后端 | 2.5, 2.6 |
 
 **阶段二完成标志**：用户拍照后，完整跑通评分展示 + 小人颜色/心情变化。
@@ -132,6 +133,8 @@
 ---
 
 ## 4. 数据模型设计
+
+> 以下数据形态以 JSON 描述（贴近 Pydantic schema 的输出形状）。SQLAlchemy ORM 模型中，`pet`、`stats` 等嵌套对象拆成同表的列或独立的 `user_pet` / `user_stats` 表均可，由后端实现侧自行选择，但对外 JSON 形状以此处为准。
 
 ### 4.1 用户表（users）
 
@@ -315,17 +318,17 @@ score = (饱和度评分 × 0.4) + (亮度评分 × 0.3) + (色彩丰富度 × 0
 
 ```
 用户点击拍照
-  → 调用相机/相册 API
-  → 图片上传到云存储
-  → 返回 URL
-  → 调用 AI 视觉云函数（传入 URL）
-    → 云函数请求 GPT-4V
-    → 解析返回 JSON
-    → 后处理校验/修正
-    → 写入 photos 表
-    → 更新 users.pet.energy
-  → 返回结果给前端
-  → 前端展示评分卡片 + 小人动画反馈
+  → <input type="file" capture="environment"> 触发系统相机
+  → 前端 canvas 压缩到 720px / 80% 质量
+  → POST /api/v1/photo/analyze (multipart/form-data) 到 FastAPI
+    → FastAPI 路由层校验图片格式
+    → services/ai_analyzer.analyze_image() 调 GPT-4V (8s 超时)
+      ↳ 超时/异常时切换 services/scorer.fallback_score()
+    → Pydantic 校验返回值（hex/score 范围）
+    → SQLAlchemy 写 photos 表
+    → services/pet_state.apply_energy_gain() 更新 users.pet.energy
+  → 返回 PhotoAnalysisResponse
+  → 前端展示评分卡片 + Pinia 更新小人状态
 ```
 
 **时间预算**：
@@ -381,9 +384,9 @@ score = (饱和度评分 × 0.4) + (亮度评分 × 0.3) + (色彩丰富度 × 0
 
 ```
 前端拍照成功后：
-  → 获取当前地理位置 (wx.getLocation / navigator.geolocation)
-  → 附带在图片上传请求中
-  → 存储在 photos 表的 location 字段
+  → 调 `navigator.geolocation.getCurrentPosition()` 获取经纬度
+  → 作为 `lat` / `lng` 字段附在 multipart 表单中
+  → FastAPI 写入 photos.lat / photos.lng 列
 
 前端地图页加载时：
   → 查询当前用户所有有 location 的 photos
@@ -400,26 +403,30 @@ score = (饱和度评分 × 0.4) + (亮度评分 × 0.3) + (色彩丰富度 × 0
 
 ### 7.1 核心接口
 
+> 所有接口前缀为 `/api/v1/`；返回值字段统一 snake_case，前端在 Axios 拦截器层转 camelCase。
+
 | 方法 | 路径 | 说明 | 请求参数 | 返回 |
 |------|------|------|----------|------|
-| POST | `/api/photo/upload` | 上传照片并分析 | `image: file`, `location: {lat, lng}` | `{photo_id, analysis, energy_change}` |
-| GET | `/api/user/profile` | 获取用户信息和小人状态 | — | `{user, pet}` |
-| PUT | `/api/user/pet/evolve` | 触发进化 | — | `{new_stage, new_appearance}` |
-| GET | `/api/tasks/current` | 获取当前任务 | — | `{task}` |
-| POST | `/api/tasks/generate` | 手动触发新任务 | — | `{new_task}` |
-| GET | `/api/photos` | 获取照片列表 | `?page=1&limit=20` | `{photos, total}` |
-| GET | `/api/photos/map` | 获取有位置的照片 | — | `[{photo_id, dominant_color, lat, lng}]` |
-| GET | `/api/collections` | 获取图鉴 | — | `{colors, combos, locations}` |
-| POST | `/api/share/generate` | 生成分享图 | `?photo_id=xxx` | `{share_image_url}` |
+| GET  | `/health` | 健康检查 | — | `{ "status": "ok" }` |
+| POST | `/photo/analyze` | 上传照片并分析 | `image: file`, `user_id`, `lat?`, `lng?` | `{photo_id, analysis, energy_change}` |
+| GET  | `/user/{user_id}/profile` | 获取用户信息和小人状态 | — | `{user, pet}` |
+| POST | `/user/{user_id}/pet/evolve` | 触发进化 | — | `{new_stage}` |
+| GET  | `/tasks/current` | 获取当前任务 | `user_id` | `{task}` |
+| POST | `/tasks/generate` | 手动触发新任务 | `user_id` | `{new_task}` |
+| GET  | `/photos` | 获取照片列表 | `user_id, page=1, limit=20` | `{photos, total}` |
+| GET  | `/photos/map` | 获取有位置的照片 | `user_id` | `[{photo_id, dominant_color, lat, lng}]` |
+| GET  | `/collections` | 获取图鉴 | `user_id` | `{colors, combos, locations}` |
+| POST | `/share/generate` | 生成分享图 | `photo_id` | `{share_image_url}` |
 
 ### 7.2 关键接口详述：上传照片
 
 ```
-POST /api/photo/upload
+POST /api/v1/photo/analyze
 Content-Type: multipart/form-data
 
 Request:
   image: File (拍照/选择)
+  user_id: string (必填)
   lat: number (可选)
   lng: number (可选)
 
@@ -428,7 +435,7 @@ Response (200):
   "photo_id": "p_20260523_001",
   "analysis": {
     "dominant_color": "#FF6B6B",
-    "palette": [...],
+    "palette": ["#FF6B6B", "#4ECDC4", "#FFE66D"],
     "score": 78,
     "comment": "这个蓝橙互补色很高级",
     "color_category": "warm",
@@ -446,10 +453,9 @@ Response (200):
   "achievements_unlocked": []      // 新解锁的成就列表
 }
 
-Error (4xx/5xx):
+Error (400/500) — FastAPI 标准格式:
 {
-  "error": "analysis_failed",
-  "message": "图片分析失败，请重试"
+  "detail": "仅支持 JPEG / PNG / WebP"
 }
 ```
 
