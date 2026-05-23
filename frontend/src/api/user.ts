@@ -24,5 +24,5 @@ export interface UserProfile {
 }
 
 export const getProfile = async (): Promise<UserProfile> => {
-  return http.get('/user/profile')
+  return http.get<UserProfile>('/user/profile')
 }

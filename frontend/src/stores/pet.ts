@@ -15,8 +15,8 @@ export const usePetStore = defineStore('pet', () => {
   const fetchProfile = async () => {
     isLoading.value = true
     try {
-      const res: any = await getProfile()
-      petInfo.value = res.data.pet
+      const profile = await getProfile()
+      petInfo.value = profile.pet
     } finally {
       isLoading.value = false
     }

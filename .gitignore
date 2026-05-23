@@ -6,6 +6,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+.vite/
 *.tsbuildinfo
 
 # Environment and logs
@@ -49,30 +50,18 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
 
-# .NET
-bin/
-obj/
-
-# SQL Server files
-*.mdf
-*.ldf
-*.ndf
-
-# Installer files
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
+# SQLite (dev data)
+*.db
+*.db-journal
+backend/data/*.db
+backend/data/*.db-*
 
 # Uploads and temp files
 uploads/
 temp/
-
-# Database files
-*.db
-*.db-journal
 
 # AI agent context files
 CLAUDE.md
