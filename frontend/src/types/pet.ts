@@ -11,5 +11,6 @@ export interface PetInfo {
   stage: number
   mood: 'happy' | 'neutral' | 'sad'
   color: string
+  totalEnergy: number
   energy: PetEnergy
 }

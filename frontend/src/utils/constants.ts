@@ -415,3 +415,37 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     check: (ids) => ['gray_black', 'gray_white', 'gray_silver'].every((id) => ids.includes(id)),
   },
 ];
+
+// ============================================================
+// 5. 精灵阶段经验值系统
+// ============================================================
+
+export const STAGE_XP_THRESHOLDS = [0, 200, 500, 1000, 2000, 5000, 10000]
+export const MAX_STAGE = STAGE_XP_THRESHOLDS.length - 1
+
+export function getStageFromXP(totalEnergy: number): number {
+  let stage = 0
+  for (let i = STAGE_XP_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (totalEnergy >= STAGE_XP_THRESHOLDS[i]) {
+      stage = i
+      break
+    }
+  }
+  return Math.min(stage, MAX_STAGE)
+}
+
+export function getStageXPProgress(totalEnergy: number): {
+  stage: number
+  currentXP: number
+  nextStageXP: number
+  progressPercent: number
+} {
+  const stage = getStageFromXP(totalEnergy)
+  const currentThreshold = STAGE_XP_THRESHOLDS[stage]
+  const nextThreshold = STAGE_XP_THRESHOLDS[Math.min(stage + 1, MAX_STAGE)]
+  const xpInStage = totalEnergy - currentThreshold
+  const xpNeeded = nextThreshold - currentThreshold
+  const progressPercent = Math.min(Math.round((xpInStage / xpNeeded) * 100), 100)
+
+  return { stage, currentXP: totalEnergy, nextStageXP: nextThreshold, progressPercent }
+}

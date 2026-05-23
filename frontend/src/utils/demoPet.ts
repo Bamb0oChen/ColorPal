@@ -6,6 +6,7 @@ export function createDemoPet(color = '#ff6b6b'): PetInfo {
     stage: 1,
     mood: 'happy',
     color,
+    totalEnergy: 340,
     energy: {
       current: 58,
       max: 100,
