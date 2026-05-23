@@ -16,11 +16,8 @@ let touchStartY = 0
 const navItems = [
   { label: '主页', name: 'home' },
   { label: '图鉴', name: 'collection' },
-  { label: '社区', name: 'community' },
   { label: '我的', name: 'profile' },
 ]
-
-const hasNewUnlock = computed(() => paletteStore.newlyUnlockedIds.length > 0)
 
 const appStyle = computed(() => ({
   '--accent-color': paletteStore.accentColor,
@@ -70,10 +67,10 @@ const canSwipeNavigate = () =>
           v-for="item in navItems"
           :key="item.name"
           class="nav-link"
+          :class="{ 'has-notice': item.name === 'collection' && paletteStore.hasCollectionNotice }"
           :to="{ name: item.name }"
         >
           {{ item.label }}
-          <span v-if="item.name === 'collection' && hasNewUnlock" class="nav-dot" />
         </RouterLink>
       </nav>
 
@@ -89,13 +86,15 @@ const canSwipeNavigate = () =>
         v-for="item in navItems"
         :key="item.name"
         class="dot-link"
-        :class="{ active: route.name === item.name }"
+        :class="{
+          active: route.name === item.name,
+          'has-notice': item.name === 'collection' && paletteStore.hasCollectionNotice,
+        }"
         :to="{ name: item.name }"
         :aria-label="item.label"
       >
         <span class="dot" />
         <span class="dot-label">{{ item.label }}</span>
-        <span v-if="item.name === 'collection' && hasNewUnlock" class="nav-dot" />
       </RouterLink>
     </nav>
 
@@ -167,6 +166,7 @@ const canSwipeNavigate = () =>
 }
 
 .nav-link {
+  position: relative;
   min-width: 72px;
   padding: 9px 14px;
   border-radius: 6px;
@@ -174,6 +174,23 @@ const canSwipeNavigate = () =>
   font-size: 14px;
   font-weight: 700;
   text-align: center;
+}
+
+.nav-link.has-notice::after,
+.dot-link.has-notice::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #ff3b30;
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.36);
+}
+
+.nav-link.has-notice::after {
+  top: 5px;
+  right: 7px;
 }
 
 .nav-link.router-link-active {
@@ -219,24 +236,9 @@ const canSwipeNavigate = () =>
   color: #777;
 }
 
-.nav-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff3b30;
-  border: 2px solid #fff;
-}
-
-.nav-link {
-  position: relative;
-}
-
-.nav-link .nav-dot {
-  top: 2px;
-  right: 2px;
+.dot-link.has-notice::after {
+  top: -4px;
+  right: 8px;
 }
 
 .dot {

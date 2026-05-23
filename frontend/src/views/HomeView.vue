@@ -6,7 +6,8 @@ import LoginPanel from '@/components/LoginPanel.vue'
 import MobileCaptureButton from '@/components/MobileCaptureButton.vue'
 import PetDisplay from '@/components/PetDisplay.vue'
 import { useDeviceMode } from '@/composables/useDeviceMode'
-import { ALL_COLORS } from '@/utils/constants'
+import { uploadAndAnalyze } from '@/api/photo'
+import { ALL_COLORS, ColorFamilyLabel, RarityLabel } from '@/utils/constants'
 import { usePaletteStore } from '@/stores/palette'
 import { usePetStore } from '@/stores/pet'
 import { useSessionStore } from '@/stores/session'
@@ -19,13 +20,32 @@ const petStore = usePetStore()
 const router = useRouter()
 const { isMobile } = useDeviceMode()
 const petEvent = ref<PetDisplayEvent>('idle')
+const isAnalyzing = ref(false)
+const analysisError = ref('')
 
 const pageStyle = computed(() => ({
   '--accent-color': paletteStore.accentColor,
 }))
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
-const collectedCount = computed(() => paletteStore.collectedColors.length)
+const collectedItems = computed(() => paletteStore.collectedColorItems)
+const collectedCount = computed(() => collectedItems.value.length)
+const recentColorItems = computed(() => collectedItems.value.slice(0, 5))
+const latestColorItem = computed(() => collectedItems.value[0])
+const colorSummary = computed(() => {
+  if (!recentColorItems.value.length) {
+    return `当前已识别 0 / ${ALL_COLORS.length} 种图鉴标准颜色，先采一张照片开始收集。`
+  }
+
+  const recentNames = recentColorItems.value.map((color) => color.name).join('、')
+  return `当前已识别 ${collectedCount.value} / ${ALL_COLORS.length} 种图鉴标准颜色，最近收集：${recentNames}。`
+})
+const latestColorDescription = computed(() => {
+  if (!latestColorItem.value) return '等待第一张照片'
+
+  const color = latestColorItem.value
+  return `${color.name} · ${ColorFamilyLabel[color.family]} · ${RarityLabel[color.rarity]}`
+})
 const progressPercent = computed(() =>
   Math.round((collectedCount.value / ALL_COLORS.length) * 100),
 )
@@ -44,13 +64,32 @@ watch(
 )
 
 const handleImageSelected = async (file: File) => {
-  paletteStore.addColorFromImageName(file.name)
-  petStore.updateEnergy({ r: 8, g: 6, b: 4, total: 12 })
+  if (isAnalyzing.value) return
+
+  isAnalyzing.value = true
+  analysisError.value = ''
   petEvent.value = 'feeding'
-  await wait(520)
-  petEvent.value = 'success'
-  await wait(280)
-  await router.push({ name: 'result' })
+
+  try {
+    const result = await uploadAndAnalyze(file)
+    paletteStore.addAnalysisResult(result)
+    petStore.updateEnergy(result.energy_change)
+    if (sessionStore.isLoggedIn) {
+      await petStore.fetchProfile().catch((err) => {
+        console.warn('[HomeView] Profile refresh failed after analysis.', err)
+      })
+    }
+    await wait(520)
+    petEvent.value = 'success'
+    await wait(280)
+    await router.push({ name: 'result' })
+  } catch (err) {
+    console.error('[HomeView] Photo analysis failed.', err)
+    analysisError.value = '照片分析暂时失败，请稍后再试一次。'
+    petEvent.value = 'idle'
+  } finally {
+    isAnalyzing.value = false
+  }
 }
 
 function wait(ms: number) {
@@ -75,12 +114,11 @@ function wait(ms: number) {
         <div class="hero-copy">
           <p class="eyebrow">ColorPal</p>
           <h1>把现实里的颜色收进你的图鉴</h1>
-          <p class="summary">
-            当前已识别 {{ collectedCount }} / {{ ALL_COLORS.length }} 种标准颜色，页面主题会跟随最近收集的颜色变化。
-          </p>
+          <p class="summary">{{ colorSummary }}</p>
           <div class="progress-track" aria-label="收集进度">
             <span :style="{ width: progressPercent + '%' }" />
           </div>
+          <p class="latest-color">{{ latestColorDescription }}</p>
         </div>
 
         <div class="spirit-stage">
@@ -91,12 +129,19 @@ function wait(ms: number) {
       <section class="capture-panel">
         <div class="palette-strip" aria-label="已收集颜色">
           <span
-            v-for="color in paletteStore.collectedColors"
-            :key="color"
-            class="swatch"
-            :style="{ backgroundColor: color }"
-          />
+            v-for="color in recentColorItems"
+            :key="color.id"
+            class="color-chip"
+            :title="`${color.name} · ${color.english}`"
+            :aria-label="`${color.name}，${ColorFamilyLabel[color.family]}，${RarityLabel[color.rarity]}`"
+          >
+            <span class="swatch" :style="{ backgroundColor: color.hex }" />
+            <span>{{ color.name }}</span>
+          </span>
         </div>
+
+        <p v-if="isAnalyzing" class="analysis-status">正在分析照片颜色...</p>
+        <p v-if="analysisError" class="analysis-error">{{ analysisError }}</p>
 
         <DesktopDropZone v-if="!isMobile" @image-selected="handleImageSelected" />
         <div v-else class="mobile-action">
@@ -179,6 +224,7 @@ function wait(ms: number) {
 
 .eyebrow,
 .summary,
+.latest-color,
 h1 {
   margin: 0;
 }
@@ -203,6 +249,13 @@ h1 {
   max-width: 460px;
   color: #606060;
   line-height: 1.7;
+}
+
+.latest-color {
+  margin-top: 12px;
+  color: var(--accent-color);
+  font-size: 14px;
+  font-weight: 850;
 }
 
 .progress-track {
@@ -230,22 +283,50 @@ h1 {
   justify-items: center;
 }
 
+.analysis-status,
+.analysis-error {
+  margin: 0;
+  color: #5f6470;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.analysis-error {
+  color: #c24150;
+}
+
 .palette-strip {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
   max-width: 420px;
   padding: 8px;
   border: 1px solid rgba(20, 20, 20, 0.08);
-  border-radius: 999px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 10px 0 7px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #343434;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .swatch {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  flex: 0 0 auto;
+  border-radius: 6px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
