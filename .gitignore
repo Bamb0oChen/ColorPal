@@ -40,3 +40,13 @@ node_modules/
 # Windows shortcuts
 *.lnk
 
+# AI agent context files
+CLAUDE.md
+AGENTS.md
+AGENT.md
+.claude/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
+.aider*
+.codex/
