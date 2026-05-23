@@ -133,7 +133,13 @@ const handlePublish = async () => {
 .create-post-page {
   min-height: 100vh;
   background: var(--color-bg);
-  padding-bottom: 100px;
+  padding: 76px 0 100px;
+}
+
+@media (max-width: 760px) {
+  .create-post-page {
+    padding-top: 0;
+  }
 }
 
 .header {

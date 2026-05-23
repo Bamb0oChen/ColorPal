@@ -1,42 +1,55 @@
 import http from './request'
-import type { Post, Comment, CreatePostRequest, CreateCommentRequest } from '@/types/community'
+import type { Post, Comment } from '@/types/community'
 
-export interface ApiResponse<T> {
-  code: number
-  data: T
-  message: string
+function userHeaders() {
+  const raw = localStorage.getItem('colorpal.session')
+  if (!raw) return {}
+  try {
+    const session = JSON.parse(raw)
+    return {
+      'X-User-Id': session.user_id || 'user_001',
+      'X-User-Name': session.display_name || '玩家',
+    }
+  } catch {
+    return {}
+  }
 }
 
-export const getPostList = async (): Promise<ApiResponse<Post[]>> => {
-  return http.get('/community/posts')
+export const getPostList = async (): Promise<Post[]> => {
+  return http.get('/community/posts', { headers: userHeaders() })
 }
 
-export const getPostDetail = async (postId: string): Promise<ApiResponse<Post>> => {
-  return http.get(`/community/posts/${postId}`)
+export const getPostDetail = async (postId: string): Promise<Post> => {
+  return http.get(`/community/posts/${postId}`, { headers: userHeaders() })
 }
 
-export const createPost = async (data: CreatePostRequest): Promise<ApiResponse<Post>> => {
+export const createPost = async (data: { content: string; images?: File[] }): Promise<Post> => {
   const formData = new FormData()
-  formData.append('content', data.content)
+  formData.append('content', data.content || '')
   if (data.images) {
     data.images.forEach((img) => formData.append('images', img))
   }
-  if (data.photoRecordId) {
-    formData.append('photoRecordId', data.photoRecordId)
-  }
   return http.post('/community/posts', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: userHeaders(),
   })
 }
 
-export const likePost = async (postId: string): Promise<ApiResponse<{ liked: boolean; likeCount: number }>> => {
-  return http.post(`/community/posts/${postId}/like`)
+export const likePost = async (postId: string): Promise<{ liked: boolean; likeCount: number }> => {
+  return http.post(`/community/posts/${postId}/like`, {}, { headers: userHeaders() })
 }
 
-export const getComments = async (postId: string): Promise<ApiResponse<Comment[]>> => {
-  return http.get(`/community/posts/${postId}/comments`)
+export const getComments = async (postId: string): Promise<Comment[]> => {
+  return http.get(`/community/posts/${postId}/comments`, { headers: userHeaders() })
 }
 
-export const createComment = async (postId: string, data: CreateCommentRequest): Promise<ApiResponse<Comment>> => {
-  return http.post(`/community/posts/${postId}/comments`, data)
+export const createComment = async (postId: string, content: string): Promise<Comment> => {
+  return http.post(`/community/posts/${postId}/comments`, { content }, { headers: userHeaders() })
+}
+
+export const getMyPosts = async (): Promise<Post[]> => {
+  return http.get('/community/posts/mine', { headers: userHeaders() })
+}
+
+export const injectDevPosts = async (): Promise<Post[]> => {
+  return http.post('/community/dev/inject', {}, { headers: userHeaders() })
 }

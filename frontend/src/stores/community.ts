@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getPostList, getPostDetail, createPost, likePost, getComments, createComment } from '@/api/community'
+import { getPostList, getPostDetail, createPost, likePost, getComments, createComment, injectDevPosts } from '@/api/community'
 import type { Post, Comment } from '@/types/community'
 
 export const useCommunityStore = defineStore('community', () => {
@@ -12,8 +12,7 @@ export const useCommunityStore = defineStore('community', () => {
   const fetchPosts = async () => {
     isLoading.value = true
     try {
-      const res = await getPostList()
-      posts.value = res.data
+      posts.value = await getPostList()
     } finally {
       isLoading.value = false
     }
@@ -22,8 +21,7 @@ export const useCommunityStore = defineStore('community', () => {
   const fetchPostDetail = async (postId: string) => {
     isLoading.value = true
     try {
-      const res = await getPostDetail(postId)
-      currentPost.value = res.data
+      currentPost.value = await getPostDetail(postId)
     } finally {
       isLoading.value = false
     }
@@ -31,43 +29,48 @@ export const useCommunityStore = defineStore('community', () => {
 
   const fetchComments = async (postId: string) => {
     try {
-      const res = await getComments(postId)
-      comments.value = res.data
+      comments.value = await getComments(postId)
     } catch (err) {
       console.error('获取评论失败', err)
     }
   }
 
-  const addPost = async (data: { content: string; images?: File[]; photoRecordId?: string }) => {
-    const res = await createPost(data)
-    posts.value.unshift(res.data)
-    return res.data
+  const addPost = async (data: { content: string; images?: File[] }) => {
+    const post = await createPost(data)
+    posts.value.unshift(post)
+    return post
   }
 
   const toggleLike = async (postId: string) => {
     const res = await likePost(postId)
-    const post = posts.value.find(p => p.id === postId)
+    const post = posts.value.find((p) => p.id === postId)
     if (post) {
-      post.liked = res.data.liked
-      post.likeCount = res.data.likeCount
+      post.liked = res.liked
+      post.likeCount = res.likeCount
     }
     if (currentPost.value && currentPost.value.id === postId) {
-      currentPost.value.liked = res.data.liked
-      currentPost.value.likeCount = res.data.likeCount
+      currentPost.value.liked = res.liked
+      currentPost.value.likeCount = res.likeCount
     }
   }
 
   const addComment = async (postId: string, content: string) => {
-    const res = await createComment(postId, { content })
-    comments.value.push(res.data)
+    const comment = await createComment(postId, content)
+    comments.value.push(comment)
     if (currentPost.value && currentPost.value.id === postId) {
       currentPost.value.commentCount += 1
     }
-    const post = posts.value.find(p => p.id === postId)
+    const post = posts.value.find((p) => p.id === postId)
     if (post) {
       post.commentCount += 1
     }
-    return res.data
+    return comment
+  }
+
+  const injectPosts = async () => {
+    const injected = await injectDevPosts()
+    posts.value = [...injected, ...posts.value]
+    return injected
   }
 
   return {
@@ -80,6 +83,7 @@ export const useCommunityStore = defineStore('community', () => {
     fetchComments,
     addPost,
     toggleLike,
-    addComment
+    addComment,
+    injectPosts,
   }
 })

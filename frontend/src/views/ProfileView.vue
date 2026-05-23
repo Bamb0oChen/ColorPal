@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import PetDisplay from '@/components/PetDisplay.vue'
 import {
   AchievementCategory,
@@ -13,22 +14,20 @@ import { usePaletteStore } from '@/stores/palette'
 import { usePetStore } from '@/stores/pet'
 import { useSessionStore } from '@/stores/session'
 import { createDemoPet } from '@/utils/demoPet'
+import { getMyPosts } from '@/api/community'
+import type { Post } from '@/types/community'
 
 const paletteStore = usePaletteStore()
 const petStore = usePetStore()
 const sessionStore = useSessionStore()
 const devMode = ref(false)
+const myPosts = ref<Post[]>([])
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
 const collectedIds = computed(() => paletteStore.collectedColors.map((color) => color))
 const progress = computed(() => getGlobalProgress(collectedIds.value))
 const progressPercent = computed(() => Math.round((progress.value.collected / progress.value.total) * 100))
-const stage = computed(() => {
-  if (progressPercent.value >= 75) return 3
-  if (progressPercent.value >= 40) return 2
-  if (progressPercent.value >= 15) return 1
-  return 0
-})
+const stage = computed(() => petStore.stageInfo.stage)
 
 const achievements = computed(() =>
   ALL_ACHIEVEMENTS.map((achievement, index) => ({
@@ -45,6 +44,11 @@ onMounted(async () => {
     await petStore.fetchProfile()
   } catch (err) {
     console.warn('[ProfileView] Profile fetch failed, using demo pet.', err)
+  }
+  try {
+    myPosts.value = await getMyPosts()
+  } catch {
+    // 社区服务不可用时静默失败
   }
 })
 </script>
@@ -105,6 +109,29 @@ onMounted(async () => {
           <strong>{{ progress.legendary.collected }}/{{ progress.legendary.total }}</strong>
           <span>传说</span>
         </div>
+      </div>
+    </section>
+
+    <section class="my-posts-panel">
+      <div class="panel-header">
+        <h2>我的帖子</h2>
+        <RouterLink class="panel-link" to="/community">去社区</RouterLink>
+      </div>
+      <div v-if="myPosts.length === 0" class="empty-posts">
+        还没有发布过色彩故事
+      </div>
+      <div v-else class="my-posts-list">
+        <article
+          v-for="post in myPosts.slice(0, 5)"
+          :key="post.id"
+          class="my-post-item"
+        >
+          <p class="my-post-content">{{ post.content }}</p>
+          <div class="my-post-meta">
+            <span>{{ post.likeCount }} 赞</span>
+            <span>{{ post.commentCount }} 评论</span>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -297,6 +324,57 @@ h1 {
   color: #856404;
   font-size: 13px;
   font-weight: 700;
+}
+
+.my-posts-panel {
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.panel-link {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.empty-posts {
+  color: var(--color-text-light);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.my-posts-list {
+  display: grid;
+  gap: 10px;
+}
+
+.my-post-item {
+  padding: 12px;
+  border: 1px solid rgba(20, 20, 20, 0.06);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.my-post-content {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-post-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-light);
 }
 
 .progress-track {

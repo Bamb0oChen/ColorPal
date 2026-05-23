@@ -93,7 +93,13 @@ const handleSubmitComment = async () => {
 .post-detail-page {
   min-height: 100vh;
   background: var(--color-bg);
-  padding-bottom: 80px;
+  padding: 76px 0 80px;
+}
+
+@media (max-width: 760px) {
+  .post-detail-page {
+    padding-top: 0;
+  }
 }
 
 .header {

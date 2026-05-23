@@ -20,8 +20,9 @@ class Settings(BaseSettings):
 
     @property
     def cors_allow_origins_list(self) -> list[str]:
-        """Expand comma-separated origins while ignoring empty items."""
-        return [origin.strip() for origin in self.cors_allow_origins.split(',') if origin.strip()]
+        if self.cors_allow_origins:
+            return [origin.strip() for origin in self.cors_allow_origins.split(',') if origin.strip()]
+        return [f'http://localhost:{p}' for p in range(5173, 5190)] + [f'http://127.0.0.1:{p}' for p in range(5173, 5190)]
 
 
 settings = Settings()

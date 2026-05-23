@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Comment } from '@/types/community'
 
 interface Props {
   comment: Comment
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+
+const avatarColor = computed(() => {
+  let hash = 0
+  for (const ch of props.comment.user.nickname) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return `hsl(${hash % 360}, 55%, 50%)`
+})
+
+const avatarInitial = computed(() => props.comment.user.nickname.charAt(0).toUpperCase())
 
 const formatTime = (timeStr: string) => {
   const date = new Date(timeStr)
@@ -24,7 +33,9 @@ const formatTime = (timeStr: string) => {
 
 <template>
   <div class="comment-item">
-    <img :src="comment.user.avatar" class="avatar" :alt="comment.user.nickname" />
+    <div class="avatar" :style="{ backgroundColor: avatarColor }">
+      <span class="avatar-initial">{{ avatarInitial }}</span>
+    </div>
     <div class="comment-content">
       <div class="comment-header">
         <span class="nickname">{{ comment.user.nickname }}</span>
@@ -53,9 +64,17 @@ const formatTime = (timeStr: string) => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid rgba(255, 107, 107, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+
+.avatar-initial {
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .comment-content {

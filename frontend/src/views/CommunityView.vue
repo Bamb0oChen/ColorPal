@@ -8,6 +8,16 @@ import CommunityHeader from '@/components/community/CommunityHeader.vue'
 const router = useRouter()
 const communityStore = useCommunityStore()
 const activeTab = ref('all')
+const isInjecting = ref(false)
+
+const handleInject = async () => {
+  isInjecting.value = true
+  try {
+    await communityStore.injectPosts()
+  } finally {
+    isInjecting.value = false
+  }
+}
 
 const tabs = [
   { id: 'all', label: '全部' },
@@ -37,6 +47,9 @@ onMounted(() => {
           {{ tab.label }}
         </button>
       </div>
+      <button class="inject-btn" :disabled="isInjecting" @click="handleInject">
+        {{ isInjecting ? '注入中...' : '注入示例' }}
+      </button>
     </div>
 
     <div class="post-list">
@@ -84,12 +97,46 @@ onMounted(() => {
 .community-page {
   min-height: 100vh;
   background: var(--color-bg);
-  padding-bottom: 100px;
+  padding: 90px 0 100px;
+}
+
+@media (max-width: 760px) {
+  .community-page {
+    padding-top: 0;
+  }
 }
 
 .tabs-wrapper {
   padding: 0 var(--spacing-md);
   margin-bottom: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.inject-btn {
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(20, 20, 20, 0.1);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-text-light);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.inject-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.inject-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .tabs {

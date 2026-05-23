@@ -11,6 +11,15 @@ const props = withDefaults(defineProps<Props>(), {
   showActions: true,
 })
 
+const avatarColor = computed(() => {
+  let hash = 0
+  for (const ch of props.post.user.nickname) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  const hue = hash % 360
+  return `hsl(${hue}, 55%, 50%)`
+})
+
+const avatarInitial = computed(() => props.post.user.nickname.charAt(0).toUpperCase())
+
 const emit = defineEmits<{
   like: [postId: string]
   click: []
@@ -39,7 +48,9 @@ const handleLike = (e: Event) => {
 <template>
   <article class="post-card" @click="emit('click')">
     <div class="post-header">
-      <img :src="post.user.avatar" class="avatar" :alt="post.user.nickname" />
+      <div class="avatar" :style="{ backgroundColor: avatarColor }">
+        <span class="avatar-initial">{{ avatarInitial }}</span>
+      </div>
       <div class="user-info">
         <span class="nickname">{{ post.user.nickname }}</span>
         <span class="time">{{ formatTime(post.createdAt) }}</span>
@@ -129,8 +140,17 @@ const handleLike = (e: Event) => {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid rgba(255, 107, 107, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-initial {
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .user-info {

@@ -27,5 +27,6 @@ def init_db():
     import app.models.user  # noqa
     import app.models.photo  # noqa
     import app.models.task   # noqa
+    import app.models.community  # noqa
 
     Base.metadata.create_all(bind=engine)

@@ -331,3 +331,42 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: 'achieve_warm_cool',  name: '冷暖对决', description: '同时拥有 5 种暖色 + 5 种冷色',   category: AchievementCategory.COMBO, color: '#00B894', swatch: 'linear-gradient(135deg, #FF6B6B 50%, #74B9FF 50%)' },
   { id: 'achieve_black_white', name: '黑白之间', description: '集齐黑 + 白 + 银',            category: AchievementCategory.COMBO, color: '#00B894', swatch: 'linear-gradient(135deg, #000000 33%, #FFFFFF 33%, #FFFFFF 66%, #C0C0C0 66%)' },
 ];
+
+// ============================================================
+// 5. 精灵阶段经验值系统
+// ============================================================
+
+/** 每级所需累计经验值（索引 = 阶段） */
+export const STAGE_XP_THRESHOLDS = [0, 200, 500, 1000, 2000, 5000, 10000]
+
+/** 最大阶段（6，对应 10000+ XP） */
+export const MAX_STAGE = STAGE_XP_THRESHOLDS.length - 1
+
+/** 根据累计经验值计算阶段 */
+export function getStageFromXP(totalEnergy: number): number {
+  let stage = 0
+  for (let i = STAGE_XP_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (totalEnergy >= STAGE_XP_THRESHOLDS[i]) {
+      stage = i
+      break
+    }
+  }
+  return Math.min(stage, MAX_STAGE)
+}
+
+/** 当前阶段的下一阶段所需经验值 */
+export function getStageXPProgress(totalEnergy: number): {
+  stage: number
+  currentXP: number
+  nextStageXP: number
+  progressPercent: number
+} {
+  const stage = getStageFromXP(totalEnergy)
+  const currentThreshold = STAGE_XP_THRESHOLDS[stage]
+  const nextThreshold = STAGE_XP_THRESHOLDS[Math.min(stage + 1, MAX_STAGE)]
+  const xpInStage = totalEnergy - currentThreshold
+  const xpNeeded = nextThreshold - currentThreshold
+  const progressPercent = Math.min(Math.round((xpInStage / xpNeeded) * 100), 100)
+
+  return { stage, currentXP: totalEnergy, nextStageXP: nextThreshold, progressPercent }
+}

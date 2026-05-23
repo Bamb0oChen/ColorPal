@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   ALL_COLORS,
   ColorFamily,
@@ -14,6 +14,10 @@ import { usePaletteStore } from '@/stores/palette'
 
 const paletteStore = usePaletteStore()
 const devMode = ref(false)
+
+onMounted(() => {
+  paletteStore.clearNewlyUnlocked()
+})
 
 const collectedIds = computed(() => {
   const ids = new Set(paletteStore.collectedColorItems.map((c) => c.id))
@@ -90,6 +94,10 @@ const collectedTotal = computed(() => collectedIds.value.size)
             }"
           >
             <div class="color-sample-wrap">
+              <span
+                v-if="paletteStore.isNewlyUnlocked(color.id)"
+                class="new-dot"
+              />
               <div
                 class="color-sample"
                 :style="{
@@ -294,6 +302,19 @@ h1 {
   width: 18px;
   height: 18px;
   color: #999;
+}
+
+.new-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  z-index: 5;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .color-info {

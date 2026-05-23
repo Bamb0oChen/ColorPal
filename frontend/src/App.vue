@@ -20,6 +20,8 @@ const navItems = [
   { label: '我的', name: 'profile' },
 ]
 
+const hasNewUnlock = computed(() => paletteStore.newlyUnlockedIds.length > 0)
+
 const appStyle = computed(() => ({
   '--accent-color': paletteStore.accentColor,
 }))
@@ -71,6 +73,7 @@ const canSwipeNavigate = () =>
           :to="{ name: item.name }"
         >
           {{ item.label }}
+          <span v-if="item.name === 'collection' && hasNewUnlock" class="nav-dot" />
         </RouterLink>
       </nav>
 
@@ -92,6 +95,7 @@ const canSwipeNavigate = () =>
       >
         <span class="dot" />
         <span class="dot-label">{{ item.label }}</span>
+        <span v-if="item.name === 'collection' && hasNewUnlock" class="nav-dot" />
       </RouterLink>
     </nav>
 
@@ -207,11 +211,32 @@ const canSwipeNavigate = () =>
 }
 
 .dot-link {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: 4px;
   min-width: 40px;
   color: #777;
+}
+
+.nav-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 2px solid #fff;
+}
+
+.nav-link {
+  position: relative;
+}
+
+.nav-link .nav-dot {
+  top: 2px;
+  right: 2px;
 }
 
 .dot {
