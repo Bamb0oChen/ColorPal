@@ -17,14 +17,14 @@
 │  (Web App)   │ ←──────────────   │  (AI + 持久化)   │
 └─────────────┘                    └────────┬────────┘
                                             │
-                                            ├──→ GPT-4V Vision API
+                                            ├──→ Qwen/DeepSeek 视觉模型
                                             ├──→ HSL 规则评分（兜底）
                                             └──→ SQLite (SQLAlchemy)
 ```
 
 **数据流向**：
 1. 用户拍照 → Vue 前端压缩 → 上传到 FastAPI
-2. FastAPI 调 GPT-4V 分析；超时/失败时走 HSL 规则评分兜底
+2. FastAPI 调 Qwen/DeepSeek 视觉模型分析；超时/失败时走 HSL 规则评分兜底
 3. FastAPI 用 SQLAlchemy 写入 SQLite（photos、users.pet.energy）
 4. 返回评分 + 能量变化给前端 → 小人状态更新
 
@@ -112,7 +112,7 @@ colorpal/                                 # 项目根目录
 │   │   │   └── task.py
 │   │   ├── services/                     # 业务服务
 │   │   │   ├── __init__.py
-│   │   │   ├── ai_analyzer.py            # GPT-4V 调用
+│   │   │   ├── ai_analyzer.py            # Qwen/DeepSeek 调用
 │   │   │   ├── scorer.py                 # HSL 兜底评分
 │   │   │   ├── pet_state.py              # 小人能量/心情计算
 │   │   │   └── task_matcher.py           # 任务完成匹配
@@ -180,18 +180,18 @@ colorpal/                                 # 项目根目录
 | | Pinia | ^2.1 | 状态管理 |
 | | Vue Router | ^4.2 | 路由 |
 | | Axios | ^1.6 | HTTP 请求 |
-| | Lottie Web | ^5.12 | 小人动画 |
+| | Live2D SDK / pixi-live2d-display | 待锁定 | Pet 表现层 |
 | | Leaflet | ^1.9 | 地图组件 |
 | **后端** | FastAPI | ^0.110 | Python 异步 Web 框架 |
 | | Uvicorn | ^0.27 | ASGI 服务器 |
 | | Pydantic | ^2.0 | 数据校验 / 接口契约 |
 | | SQLAlchemy | ^2.0 | ORM（异步 session） |
 | | aiosqlite | ^0.19 | SQLite 异步驱动 |
-| | httpx | ^0.27 | 异步 HTTP 客户端（调 GPT-4V） |
+| | httpx | ^0.27 | 异步 HTTP 客户端（调 Qwen/DeepSeek 视觉模型） |
 | | python-multipart | — | 文件上传 |
 | | Pillow | ^10.0 | 图像处理（HSL 兜底） |
 | **数据库** | SQLite | — | 单文件，零运维；后期可换 PostgreSQL |
-| **AI** | OpenAI API | gpt-4-vision-preview | 视觉分析 |
+| **AI** | Qwen / DeepSeek 视觉模型 | `VISION_MODEL` 配置 | 视觉分析 |
 | **部署** | Docker + Docker Compose | — | 容器化 |
 
 ### 2.2 关键接口契约位置
@@ -422,7 +422,7 @@ async def analyze_photo(
 
 ```python
 # backend/app/services/ai_analyzer.py
-"""GPT-4V 调用，主路径失败时走 HSL 兜底。"""
+"""Qwen/DeepSeek 视觉模型调用，主路径失败时走 HSL 兜底。"""
 
 import base64
 import json
@@ -441,25 +441,25 @@ SYSTEM_PROMPT = '你是一位专业的色彩分析师。分析照片，输出 JS
 
 
 async def analyze_image(image_bytes: bytes) -> dict:
-    """主路径 GPT-4V，超时/失败时切换到 HSL 兜底，调用方无需感知。"""
+    """主路径视觉模型，超时/失败时切换到 HSL 兜底，调用方无需感知。"""
     try:
-        return await _call_gpt4v(image_bytes)
+        return await _call_vision_model(image_bytes)
     except Exception as err:
-        logger.warning('GPT-4V 失败，切换兜底评分: %s', err)
+        logger.warning('视觉模型失败，切换兜底评分: %s', err)
         return fallback_score(image_bytes)
 
 
-async def _call_gpt4v(image_bytes: bytes) -> dict:
+async def _call_vision_model(image_bytes: bytes) -> dict:
     b64 = base64.b64encode(image_bytes).decode()
     async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
         resp = await client.post(
-            'https://api.openai.com/v1/chat/completions',
+            settings.vision_api_base_url,
             headers={
-                'Authorization': f'Bearer {settings.OPENAI_API_KEY}',
+                'Authorization': f'Bearer {settings.vision_api_key}',
                 'Content-Type': 'application/json',
             },
             json={
-                'model': 'gpt-4-vision-preview',
+                'model': settings.vision_model,
                 'messages': [
                     {'role': 'system', 'content': SYSTEM_PROMPT},
                     {
@@ -559,7 +559,7 @@ type: feat / fix / docs / refactor / style / chore
 
 ```
 feat(frontend): 拍照页集成相机 API
-feat(backend): 对接 GPT-4V 分析接口
+feat(backend): 对接 Qwen 视觉分析接口
 fix(backend): AI 超时后未正确降级到兜底评分
 docs: 同步技术方案到两层架构
 ```
@@ -587,7 +587,7 @@ docs: 同步技术方案到两层架构
 
 | 场景 | 级别 | 应对 |
 |------|------|------|
-| GPT-4V API 超时或 key 失效 | **P0** | `analyze_image()` 自动降级到 `fallback_score()`，前端无感知 |
+| 视觉模型 API 超时或 key 失效 | **P0** | `analyze_image()` 自动降级到 `fallback_score()`，前端无感知 |
 | 上传图片体积过大 | **P1** | 前端拍照后压缩到 720px / 80% 质量再上传 |
 | 前端 CORS 配置错误 | **P1** | 检查 `backend/app/middleware/cors.py` 的允许域 |
 | SQLite 写入冲突 | **P2** | 异步 session 已 serialize；如果出现先确认是否多进程写 |
@@ -596,7 +596,7 @@ docs: 同步技术方案到两层架构
 ### 4.3 降级策略
 
 ```
-GPT-4V 可用 ──→ AI 评分（主路径）
+Qwen/DeepSeek 可用 ──→ AI 评分（主路径）
       ↓ 不可用或超时（8s）
 HSL 规则评分（兜底，纯本地计算）──→ 仍返回评分
       ↓ 也异常
@@ -626,7 +626,7 @@ HSL 规则评分（兜底，纯本地计算）──→ 仍返回评分
 - 路由层只做协议解析，业务逻辑放 services/，数据库访问放 models/
 
 通用要求:
-- 所有外部调用 (OpenAI、文件 IO) 必须 try/except
+- 所有外部调用 (视觉模型、文件 IO) 必须 try/except
 - 注释用中文，解释为什么而非是什么
 - 配置项一律走环境变量（pydantic-settings）
 - 错误返回 FastAPI 的 HTTPException，前端 axios 拦截器统一处理
@@ -786,7 +786,7 @@ npm run dev
 ### 6.3 Docker 一键启动
 
 ```bash
-cp .env.example .env       # 填入 OPENAI_API_KEY
+cp .env.example .env       # 填入 VISION_API_KEY
 docker compose up --build
 ```
 
@@ -803,7 +803,10 @@ docker compose up --build
 
 | 变量 | 必填 | 默认 | 说明 |
 |------|------|------|------|
-| `OPENAI_API_KEY` | ✅ | — | GPT-4V 调用密钥 |
+| `VISION_PROVIDER` | — | `qwen` | 视觉模型供应商标识，仅用于日志和切换说明 |
+| `VISION_API_KEY` | ✅ | — | Qwen / DeepSeek 视觉模型调用密钥 |
+| `VISION_API_BASE_URL` | — | DashScope 兼容接口 | OpenAI-compatible chat completions 地址 |
+| `VISION_MODEL` | — | `qwen-vl-max` | 视觉模型名称 |
 | `DATABASE_URL` | — | `sqlite+aiosqlite:///./data/colorpal.db` | SQLAlchemy 连接串 |
 | `CORS_ALLOW_ORIGINS` | — | `http://localhost:5173` | 前端域名（逗号分隔多个） |
 | `VITE_API_BASE` | — | `http://localhost:8000` | 前端连后端的基础 URL |

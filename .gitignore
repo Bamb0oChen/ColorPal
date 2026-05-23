@@ -1,13 +1,30 @@
-# Visual Studio files
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment and logs
+.env
+.env.local
+*.log
+
+# IDE and editor
+.idea/
+.vscode/
 .vs/
 *.user
 *.userosscache
 *.suo
 *.userprefs
-.vscode/
 *.vspscc
 *.vssscc
-.builds
+*.builds
 *.pidb
 *.svclog
 *.scc
@@ -27,29 +44,21 @@ $RECYCLE.BIN/
 *.ldf
 *.ndf
 
-# Node.js
-node_modules/
-dist/
-.vite/
-
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
 .venv/
+venv/
 .pytest_cache/
 .ruff_cache/
-*.egg-info/
-
-# TypeScript build cache
-*.tsbuildinfo
 
 # SQLite (dev data)
+*.db
+*.db-journal
 backend/data/*.db
 backend/data/*.db-*
-
-# Environment
-.env
-.env.local
 
 # Installer files
 *.cab
@@ -60,6 +69,10 @@ backend/data/*.db-*
 
 # Windows shortcuts
 *.lnk
+
+# Uploads and temp files
+uploads/
+temp/
 
 # AI agent context files
 CLAUDE.md
