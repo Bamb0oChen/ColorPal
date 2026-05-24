@@ -3,23 +3,45 @@ services:
     build:
       context: ./backend
     container_name: colorpal-backend
+    restart: unless-stopped
     environment:
       - VISION_PROVIDER=${VISION_PROVIDER:-qwen}
       - VISION_API_KEY=${VISION_API_KEY:-}
       - VISION_API_BASE_URL=${VISION_API_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions}
       - VISION_MODEL=${VISION_MODEL:-qwen-vl-max}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CHAT_API_KEY=${CHAT_API_KEY:-}
+      - CHAT_API_BASE_URL=${CHAT_API_BASE_URL:-}
+      - CHAT_MODEL=${CHAT_MODEL:-}
       - DATABASE_URL=sqlite:////app/data/colorpal.db
-      - CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:8080
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}
+      - PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      - GITHUB_DISCUSSION_URL=${GITHUB_DISCUSSION_URL:-https://github.com/Bamb0oChen/ColorPal/discussions}
     volumes:
-      - ./backend/data:/app/data
+      - colorpal-data:/app/data
+      - colorpal-uploads:/app/uploads
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build:
       context: ./frontend
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
     container_name: colorpal-frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "8080:80"
+      - "${FRONTEND_PORT:-8080}:80"
+
+volumes:
+  colorpal-data:
+  colorpal-uploads:
