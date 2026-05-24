@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, shallowRef, onMounted, watch } from 'vue'
 import L from 'leaflet'
 import gcoord from 'gcoord'
+import RouteInputDialog from '@/components/RouteInputDialog.vue'
 import { useLocation } from '@/composables/useLocation'
 import { useRouteStore } from '@/stores/route'
 import type { Place } from '@/types/map'
@@ -10,14 +11,14 @@ import type { ColorRoutePoint } from '@/types/route'
 const { getCurrentLocation } = useLocation()
 const routeStore = useRouteStore()
 
-const places = ref<Place[]>([])
 const selectedPlace = ref<Place | null>(null)
-const mapInstance = ref<L.Map | null>(null)
-const markers = ref<L.Marker[]>([])
-const routeMarkers = ref<L.Marker[]>([])
+const mapInstance = shallowRef<L.Map | null>(null)
+const markers = shallowRef<L.Layer[]>([])
+const routeMarkers = shallowRef<L.Layer[]>([])
 const currentLocation = ref<{ lat: number; lng: number }>({ lat: 0, lng: 0 })
 const isLocating = ref(true)
 const showBottomSheet = ref(false)
+const showRouteDialog = ref(false)
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
@@ -29,7 +30,7 @@ function handleSearch() {
 }
 const radiusOptions = [500, 1000, 3000, 5000, 10000]
 const selectedRadius = ref(3000)
-const radiusCircle = ref<L.Circle | null>(null)
+const radiusCircle = shallowRef<L.Circle | null>(null)
 
 const wgs84ToGcj02 = (lat: number, lng: number): [number, number] => {
   const result = gcoord.transform([lng, lat], gcoord.WGS84, gcoord.GCJ02)
@@ -135,7 +136,9 @@ const searchNearbyScenicSpots = async (): Promise<Place[]> => {
 const refreshMarkers = async () => {
   if (!mapInstance.value) return
 
-  markers.value.forEach((m: L.Marker) => mapInstance.value?.removeLayer(m))
+  markers.value.forEach((m) => {
+    mapInstance.value?.removeLayer(m)
+  })
   markers.value = []
 
   const spots = await searchNearbyScenicSpots()
@@ -191,7 +194,9 @@ const handleRadiusChange = (radius: number) => {
 
 /** 在地图上渲染颜色路线点位 */
 function renderRoutePoints(points: ColorRoutePoint[]) {
-  routeMarkers.value.forEach((m) => mapInstance.value?.removeLayer(m))
+  routeMarkers.value.forEach((m) => {
+    mapInstance.value?.removeLayer(m)
+  })
   routeMarkers.value = []
   if (!mapInstance.value || points.length === 0) return
 

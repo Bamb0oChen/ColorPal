@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     chat_model: str = ''
     database_url: str = ''
     cors_allow_origins: str = ''
+    public_api_base_url: str = 'http://localhost:8000'
     github_discussion_url: str = ''
 
     @property

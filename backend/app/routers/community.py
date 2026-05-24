@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File,
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
+from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.models.community import CommunityPost, CommunityComment, CommunityLike
@@ -119,7 +120,7 @@ async def create_post(
         filepath = UPLOAD_DIR / filename
         content_bytes = await img.read()
         filepath.write_bytes(content_bytes)
-        image_urls.append(f"http://127.0.0.1:8000{STATIC_URL}/{filename}")
+        image_urls.append(f"{settings.public_api_base_url.rstrip('/')}{STATIC_URL}/{filename}")
 
     post = CommunityPost(
         id=str(uuid.uuid4()),
