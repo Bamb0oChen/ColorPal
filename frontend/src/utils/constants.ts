@@ -300,6 +300,8 @@ export interface Achievement {
   check?: (collectedIds: string[]) => boolean
   /** 成就标识色 */
   color: string
+  /** 展示色值：单色 hex 或 CSS 渐变 */
+  swatch?: string
 }
 
 /** 内置成就列表 */

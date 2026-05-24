@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PetDisplay from '@/components/PetDisplay.vue'
 import {
   ALL_ACHIEVEMENTS,
@@ -16,17 +16,13 @@ import { createDemoPet } from '@/utils/demoPet'
 const paletteStore = usePaletteStore()
 const petStore = usePetStore()
 const sessionStore = useSessionStore()
+const devMode = ref(false)
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
-const collectedIds = computed(() => paletteStore.collectedColors.map((color) => color))
+const collectedIds = computed(() => paletteStore.collectedColorItems.map((c) => c.id))
 const progress = computed(() => getGlobalProgress(collectedIds.value))
 const progressPercent = computed(() => Math.round((progress.value.collected / progress.value.total) * 100))
-const stage = computed(() => {
-  if (progressPercent.value >= 75) return 3
-  if (progressPercent.value >= 40) return 2
-  if (progressPercent.value >= 15) return 1
-  return 0
-})
+const stage = computed(() => petStore.stageInfo.stage)
 
 const achievements = computed(() =>
   ALL_ACHIEVEMENTS.map((achievement) => ({
@@ -109,8 +105,19 @@ onMounted(async () => {
     <section class="achievement-panel">
       <div class="panel-header">
         <h2>成就</h2>
-        <span>{{ unlockedCount }}/{{ ALL_ACHIEVEMENTS.length }}</span>
+        <div class="panel-header-right">
+          <span>{{ unlockedCount }}/{{ ALL_ACHIEVEMENTS.length }}</span>
+          <button
+            class="dev-button"
+            :class="{ active: devMode }"
+            title="开发者模式：解锁全部成就"
+            @click="devMode = !devMode"
+          >
+            Dev
+          </button>
+        </div>
       </div>
+      <div v-if="devMode" class="dev-banner">开发者模式 — 所有成就已解锁（仅前端展示）</div>
 
       <div class="achievement-list">
         <article
@@ -225,6 +232,46 @@ h1 {
 
 .panel-header h2 {
   font-size: 22px;
+}
+
+.panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-header-right span {
+  color: var(--accent-color, #ff6b6b);
+  font-weight: 850;
+}
+
+.dev-button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(20, 20, 20, 0.1);
+  border-radius: 6px;
+  background: #fff;
+  color: #888;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+.dev-button.active {
+  border-color: #ff6b6b;
+  background: #ff6b6b;
+  color: #fff;
+}
+
+.dev-banner {
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .panel-header span {

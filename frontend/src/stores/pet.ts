@@ -44,5 +44,5 @@ export const usePetStore = defineStore('pet', () => {
     }
   }
 
-  return { petInfo, isLoading, energyPercent, fetchProfile, updateEnergy }
+  return { petInfo, isLoading, energyPercent, stageInfo, fetchProfile, updateEnergy }
 })
