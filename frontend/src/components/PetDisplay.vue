@@ -9,6 +9,7 @@ import type { PetInfo } from '@/types/pet'
 import {
   cubism2RuntimeScript,
   defaultPetModel,
+  makeModelSettings,
   type PetDisplayEvent,
   type PetDisplaySize,
 } from '@/utils/live2d'
@@ -121,7 +122,8 @@ async function mountLive2d() {
     app.value = pixiApp
     canvasHost.value.appendChild(pixiApp.view as HTMLCanvasElement)
 
-    const live2dModel = await Live2DModel.from(props.modelPath, {
+    const settings = await makeModelSettings(props.pet.color)
+    const live2dModel = await Live2DModel.from(settings, {
       autoInteract: props.interactive,
       motionPreload: MotionPreloadStrategy.IDLE,
     })

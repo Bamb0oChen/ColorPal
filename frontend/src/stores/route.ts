@@ -3,13 +3,17 @@
  *
  * 使用方式：
  *   const routeStore = useRouteStore()
- *   routeStore.suggestRoute(input)  // 输入链接或文字
+ *   routeStore.suggestRoute(input, resolver)  // 输入链接或文字
  *   routeStore.activeRoute          // 当前选中的路线
  *   routeStore.selectRoute(index)   // 切换路线
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { parseRouteInput, type ColorRouteSuggestionWithMeta } from '@/types/route'
+import { parseRouteInput, type ColorRouteSuggestion, type ColorRouteSuggestionWithMeta } from '@/types/route'
+
+type RouteSuggestionResolver = (
+  input: string,
+) => ColorRouteSuggestion[] | Promise<ColorRouteSuggestion[]>
 
 export const useRouteStore = defineStore('route', () => {
   const suggestions = ref<ColorRouteSuggestionWithMeta[]>([])
@@ -20,15 +24,11 @@ export const useRouteStore = defineStore('route', () => {
 
   const hasActiveRoute = computed(() => activeRoute.value !== null)
 
-  /**
-   * 输入链接/文字 → 解析 → 更新建议列表
-   * 明日硬编码映射在 parseRouteInput 内部实现
-   */
-  async function suggestRoute(input: string) {
+  async function suggestRoute(input: string, resolver?: RouteSuggestionResolver) {
     isProcessing.value = true
     try {
-      // 模拟异步（明日替换为真实逻辑）
-      const result = await Promise.resolve(parseRouteInput(input))
+      const onlineResult = resolver ? await resolver(input) : []
+      const result = onlineResult.length > 0 ? onlineResult : parseRouteInput(input)
       suggestions.value = result
       activeIndex.value = 0
     } finally {

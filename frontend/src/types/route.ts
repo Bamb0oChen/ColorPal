@@ -1,9 +1,9 @@
 /**
  * 颜色旅行路径系统类型定义
  *
- * 接口说明（供明日硬编码对接用）：
+ * 接口说明（供离线 demo 兜底用）：
  *   parseRouteInput(input)  → ColorRouteSuggestion[]
- *   输入抖音链接或文字，返回一组颜色路线建议
+ *   输入抖音链接或文字，在联网规划失败时返回一组本地路线建议
  */
 
 /** 路径上的一个颜色点位 */
@@ -41,13 +41,9 @@ export type RouteInputSource = 'douyin' | 'text'
 export interface RouteParseResult {
   source: RouteInputSource
   rawInput: string
-  /** 交给明日硬编码映射：返回 ColorRouteSuggestion[] */
+  /** 联网规划失败时的备用建议路线 */
   suggestions: ColorRouteSuggestion[]
 }
-
-// ============================================================
-// 明日对接接口：替换此函数的实现即可
-// ============================================================
 
 /**
  * 返回匹配结果的元信息（视频来源、匹配标签等）
@@ -78,6 +74,7 @@ const DEMO_ROUTES: { urls: string[]; kw: string[]; route: ColorRouteSuggestion; 
     urls: [],
     kw: ['绿', 'green', '自然', '紫金港'],
     route: {
+
       title: '绿色·紫金漫步',
       description: '浙大紫金港周边的绿色角落',
       themeColor: '#7CFC00',
