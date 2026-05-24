@@ -14,16 +14,42 @@ const AMAP_WEB_SERVICE_KEY = import.meta.env.VITE_AMAP_WEB_SERVICE_KEY?.trim() |
 const FALLBACK_LOCATION = { lat: 30.310270426774228, lng: 120.08862685063117 }
 let hasWarnedMissingAmapKey = false
 
+type BrowserLocation = Location & { accuracy?: number }
+
 const selectedPlace = ref<Place | null>(null)
 const mapInstance = shallowRef<L.Map | null>(null)
 const markers = shallowRef<L.Layer[]>([])
 const routeMarkers = shallowRef<L.Layer[]>([])
-const currentLocation = ref<{ lat: number; lng: number }>({ lat: 0, lng: 0 })
-const isLocating = ref(true)
+const userLocationMarker = shallowRef<L.Marker | null>(null)
+const currentLocation = ref<Location>({ ...FALLBACK_LOCATION })
+const isLocating = ref(false)
+const locationStatus = ref<'fallback' | 'requesting' | 'granted' | 'approximate' | 'failed'>('fallback')
+const locationAccuracy = ref<number | null>(null)
+const locationMessage = ref('')
+const showLocationMessage = ref(false)
 const showBottomSheet = ref(false)
 const showRouteDialog = ref(false)
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
+let locationMessageTimer: number | null = null
+
+function showTemporaryLocationMessage(message: string, autoHide = true) {
+  if (locationMessageTimer !== null) {
+    window.clearTimeout(locationMessageTimer)
+    locationMessageTimer = null
+  }
+
+  locationMessage.value = message
+  showLocationMessage.value = true
+
+  if (autoHide) {
+    locationMessageTimer = window.setTimeout(() => {
+      showLocationMessage.value = false
+      locationMessage.value = ''
+      locationMessageTimer = null
+    }, 5000)
+  }
+}
 
 async function handleSearch() {
   const q = searchQuery.value.trim()
@@ -339,7 +365,7 @@ const searchNearbyPlaces = async (options: NearbySearchOptions = {}): Promise<Pl
 
   if (!AMAP_WEB_SERVICE_KEY) {
     if (!hasWarnedMissingAmapKey) {
-      console.warn('[MapView] 未配置 VITE_AMAP_WEB_SERVICE_KEY，使用本地路线兜底。')
+      console.warn('[MapView] 未配置 VITE_AMAP_WEB_SERVICE_KEY，使用本地路线。')
       hasWarnedMissingAmapKey = true
     }
     return allSpots
@@ -542,6 +568,9 @@ const initMap = () => {
 
 const addCurrentLocationMarker = () => {
   if (!mapInstance.value) return
+  if (userLocationMarker.value) {
+    mapInstance.value.removeLayer(userLocationMarker.value)
+  }
   const [gcjLat, gcjLng] = wgs84ToGcj02(currentLocation.value.lat, currentLocation.value.lng)
   const icon = L.divIcon({
     className: 'user-marker',
@@ -549,12 +578,30 @@ const addCurrentLocationMarker = () => {
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   })
-  L.marker([gcjLat, gcjLng], { icon }).addTo(mapInstance.value).bindPopup('我的位置')
+  const popupText = locationStatus.value === 'granted' || locationStatus.value === 'approximate'
+    ? '我的位置'
+    : '推荐位置'
+  userLocationMarker.value = L.marker([gcjLat, gcjLng], { icon })
+    .addTo(mapInstance.value)
+    .bindPopup(popupText)
 }
 
 function fitToRadius() {
   if (!mapInstance.value || !radiusCircle.value) return
   mapInstance.value.fitBounds(radiusCircle.value.getBounds(), { padding: [40, 40] })
+}
+
+async function applyLocation(loc: Location) {
+  currentLocation.value = loc
+  const [gcjLat, gcjLng] = wgs84ToGcj02(loc.lat, loc.lng)
+  mapInstance.value?.setView([gcjLat, gcjLng], 15)
+  addCurrentLocationMarker()
+  updateRadiusCircle()
+  if (routeStore.hasActiveRoute && searchQuery.value.trim()) {
+    await handleSearch()
+  } else {
+    await refreshMarkers()
+  }
 }
 
 const handleRadiusChange = async (radius: number) => {
@@ -628,41 +675,31 @@ watch(() => routeStore.activeRoute, (route) => {
 })
 
 const handleLocate = async () => {
+  if (isLocating.value) return
+  isLocating.value = true
+  locationStatus.value = 'requesting'
+  showTemporaryLocationMessage('正在定位，请在浏览器弹窗中选择允许', false)
   try {
-    const loc = await getCurrentLocation()
-    currentLocation.value = loc
-    const [gcjLat, gcjLng] = wgs84ToGcj02(loc.lat, loc.lng)
-    mapInstance.value?.setView([gcjLat, gcjLng], 15)
-    addCurrentLocationMarker()
-    updateRadiusCircle()
-    if (routeStore.hasActiveRoute && searchQuery.value.trim()) {
-      handleSearch()
-    } else {
-      refreshMarkers()
-    }
-  } catch { /* ignore */ }
+    const loc: BrowserLocation = await getCurrentLocation()
+    locationAccuracy.value = loc.accuracy ?? null
+    const isApproximate = loc.accuracy !== undefined && loc.accuracy > 1000
+    locationStatus.value = isApproximate ? 'approximate' : 'granted'
+    showTemporaryLocationMessage(isApproximate ? '定位成功' : '精确定位成功')
+    await applyLocation(loc)
+  } catch {
+    locationStatus.value = 'failed'
+    locationAccuracy.value = null
+    showTemporaryLocationMessage('定位失败，请重试')
+    await applyLocation(FALLBACK_LOCATION)
+  } finally {
+    isLocating.value = false
+  }
 }
 
 onMounted(async () => {
   initMap()
-  try {
-    const loc = await getCurrentLocation()
-    currentLocation.value = loc
-    const [gcjLat, gcjLng] = wgs84ToGcj02(loc.lat, loc.lng)
-    mapInstance.value?.setView([gcjLat, gcjLng], 15)
-    updateRadiusCircle()
-    addCurrentLocationMarker()
-    setTimeout(() => refreshMarkers(), 500)
-  } catch {
-    currentLocation.value = FALLBACK_LOCATION
-    const [gcjLat, gcjLng] = wgs84ToGcj02(currentLocation.value.lat, currentLocation.value.lng)
-    mapInstance.value?.setView([gcjLat, gcjLng], 15)
-    updateRadiusCircle()
-    addCurrentLocationMarker()
-    setTimeout(() => refreshMarkers(), 500)
-  } finally {
-    isLocating.value = false
-  }
+  addCurrentLocationMarker()
+  setTimeout(() => refreshMarkers(), 500)
 })
 </script>
 
@@ -721,6 +758,23 @@ onMounted(async () => {
         @click="handleRadiusChange(r)"
       >
         {{ r / 1000 }}km
+      </button>
+    </div>
+
+    <div class="location-control">
+      <div v-if="showLocationMessage" :class="['location-toast', `status-${locationStatus}`]">
+        <div class="location-copy">
+          <span class="location-dot" />
+          <span>{{ locationMessage }}</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="locate-btn"
+        :disabled="isLocating"
+        @click="handleLocate"
+      >
+        {{ isLocating ? '定位中...' : '点击定位' }}
       </button>
     </div>
 
@@ -855,6 +909,90 @@ onMounted(async () => {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-white);
+}
+
+.location-control {
+  position: absolute;
+  top: 124px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.location-toast {
+  max-width: 100%;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.location-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.location-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #94a3b8;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.18);
+}
+
+.status-requesting .location-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
+}
+
+.status-granted .location-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+}
+
+.status-approximate .location-dot {
+  background: #f97316;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.18);
+}
+
+.status-failed .location-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16);
+}
+
+.locate-btn {
+  flex-shrink: 0;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #1f2937;
+  color: var(--color-white);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+
+.locate-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .sheet-overlay {
