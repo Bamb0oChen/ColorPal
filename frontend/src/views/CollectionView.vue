@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   ALL_COLORS,
   ColorFamily,
@@ -13,8 +13,19 @@ import {
 import { usePaletteStore } from '@/stores/palette'
 
 const paletteStore = usePaletteStore()
+const devMode = ref(false)
 
-const collectedIds = computed(() => new Set(paletteStore.collectedColorItems.map((color) => color.id)))
+onMounted(() => {
+  paletteStore.clearCollectionNotice()
+})
+
+const collectedIds = computed(() => {
+  const ids = new Set(paletteStore.collectedColorItems.map((c) => c.id))
+  if (devMode.value) {
+    ALL_COLORS.forEach((c) => ids.add(c.id))
+  }
+  return ids
+})
 
 const families = computed(() =>
   Object.values(ColorFamily).map((family) => {
@@ -42,11 +53,25 @@ const collectedTotal = computed(() => collectedIds.value.size)
         <p class="eyebrow">Collection</p>
         <h1>颜色图鉴</h1>
       </div>
-      <div class="summary-pill">
-        <strong>{{ collectedTotal }}</strong>
-        <span>/ {{ ALL_COLORS.length }}</span>
+      <div class="heading-actions">
+        <div class="summary-pill">
+          <strong>{{ collectedTotal }}</strong>
+          <span>/ {{ ALL_COLORS.length }}</span>
+        </div>
+        <button
+          class="dev-button"
+          :class="{ active: devMode }"
+          title="开发者模式：显示全部颜色"
+          @click="devMode = !devMode"
+        >
+          Dev
+        </button>
       </div>
     </header>
+
+    <div v-if="devMode" class="dev-banner">
+      开发者模式 — 所有颜色已解锁（仅前端展示）
+    </div>
 
     <div class="family-list">
       <section v-for="group in families" :key="group.family" class="family-section">
@@ -63,15 +88,32 @@ const collectedTotal = computed(() => collectedIds.value.size)
             v-for="color in group.colors"
             :key="color.id"
             class="color-card"
-            :class="{ collected: collectedIds.has(color.id) }"
+            :class="{ collected: collectedIds.has(color.id), locked: !collectedIds.has(color.id) }"
           >
-            <div
-              class="color-sample"
-              :style="{ backgroundColor: color.hex, borderColor: color.hex === '#FFFFFF' ? '#ddd' : color.hex }"
-            />
+            <div class="color-sample-wrap">
+              <span
+                v-if="paletteStore.unseenCollectionIds.includes(color.id)"
+                class="new-dot"
+              />
+              <div
+                class="color-sample"
+                :style="{
+                  backgroundColor: collectedIds.has(color.id) ? color.hex : '#e8e8e8',
+                  borderColor: collectedIds.has(color.id)
+                    ? (color.hex === '#FFFFFF' ? '#ddd' : color.hex)
+                    : '#d0d0d0',
+                }"
+              />
+              <div v-if="!collectedIds.has(color.id)" class="lock-mask">
+                <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+            </div>
             <div class="color-info">
-              <strong>{{ color.name }}</strong>
-              <span>{{ color.english }}</span>
+              <strong>{{ collectedIds.has(color.id) ? color.name : '???' }}</strong>
+              <span>{{ collectedIds.has(color.id) ? color.english : '未收集' }}</span>
             </div>
             <div class="rarity" :style="{ color: RarityColor[color.rarity] }">
               <span>{{ RarityLabel[color.rarity] }}</span>
@@ -98,6 +140,12 @@ const collectedTotal = computed(() => collectedIds.value.size)
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 28px;
+}
+
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .eyebrow,
@@ -132,6 +180,35 @@ h1 {
 .summary-pill strong {
   color: var(--accent-color, #ff6b6b);
   font-size: 28px;
+}
+
+.dev-button {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(20, 20, 20, 0.1);
+  border-radius: 6px;
+  background: #fff;
+  color: #888;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+.dev-button.active {
+  border-color: #ff6b6b;
+  background: #ff6b6b;
+  color: #fff;
+}
+
+.dev-banner {
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .family-list {
@@ -194,11 +271,47 @@ h1 {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
 }
 
+.color-sample-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+}
+
 .color-sample {
   width: 42px;
   height: 42px;
   border: 1px solid;
   border-radius: 8px;
+}
+
+.lock-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.lock-icon {
+  width: 18px;
+  height: 18px;
+  color: #999;
+}
+
+.new-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  z-index: 5;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .color-info {

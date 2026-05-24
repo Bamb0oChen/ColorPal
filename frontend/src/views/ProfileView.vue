@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import PetDisplay from '@/components/PetDisplay.vue'
 import {
+  AchievementCategory,
   ALL_ACHIEVEMENTS,
   ALL_COLORS,
   AchievementCategoryColor,
@@ -12,11 +14,14 @@ import { usePaletteStore } from '@/stores/palette'
 import { usePetStore } from '@/stores/pet'
 import { useSessionStore } from '@/stores/session'
 import { createDemoPet } from '@/utils/demoPet'
+import { getMyPosts } from '@/api/community'
+import type { Post } from '@/types/community'
 
 const paletteStore = usePaletteStore()
 const petStore = usePetStore()
 const sessionStore = useSessionStore()
 const devMode = ref(false)
+const myPosts = ref<Post[]>([])
 
 const displayPet = computed(() => petStore.petInfo ?? createDemoPet(paletteStore.accentColor))
 const collectedIds = computed(() => paletteStore.collectedColorItems.map((c) => c.id))
@@ -39,6 +44,11 @@ onMounted(async () => {
     await petStore.fetchProfile()
   } catch (err) {
     console.warn('[ProfileView] Profile fetch failed, using demo pet.', err)
+  }
+  try {
+    myPosts.value = await getMyPosts()
+  } catch {
+    // 社区服务不可用时静默失败
   }
 })
 </script>
@@ -102,6 +112,29 @@ onMounted(async () => {
       </div>
     </section>
 
+    <section class="my-posts-panel">
+      <div class="panel-header">
+        <h2>我的帖子</h2>
+        <RouterLink class="panel-link" to="/community">去社区</RouterLink>
+      </div>
+      <div v-if="myPosts.length === 0" class="empty-posts">
+        还没有发布过色彩故事
+      </div>
+      <div v-else class="my-posts-list">
+        <article
+          v-for="post in myPosts.slice(0, 5)"
+          :key="post.id"
+          class="my-post-item"
+        >
+          <p class="my-post-content">{{ post.content }}</p>
+          <div class="my-post-meta">
+            <span>{{ post.likeCount }} 赞</span>
+            <span>{{ post.commentCount }} 评论</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section class="achievement-panel">
       <div class="panel-header">
         <h2>成就</h2>
@@ -124,14 +157,33 @@ onMounted(async () => {
           v-for="item in achievements"
           :key="item.id"
           class="achievement-card"
-          :class="{ unlocked: item.unlocked }"
+          :class="{
+            unlocked: item.unlocked,
+            locked: !item.unlocked && (item.category === AchievementCategory.RARITY || item.category === AchievementCategory.COMBO),
+          }"
         >
-          <span class="achievement-mark" :style="{ backgroundColor: AchievementCategoryColor[item.category] }" />
-          <div>
-            <strong>{{ item.name }}</strong>
-            <p>{{ item.description }}</p>
+          <div class="achievement-card-inner">
+            <span
+              class="achievement-mark"
+              :style="{
+                background: item.swatch || AchievementCategoryColor[item.category],
+              }"
+            />
+            <div>
+              <strong>{{ item.unlocked ? item.name : '???' }}</strong>
+              <p>{{ item.unlocked ? item.description : '未解锁' }}</p>
+            </div>
+            <small>{{ AchievementCategoryLabel[item.category] }}</small>
           </div>
-          <small>{{ AchievementCategoryLabel[item.category] }}</small>
+          <div
+            v-if="!item.unlocked && (item.category === AchievementCategory.RARITY || item.category === AchievementCategory.COMBO)"
+            class="ach-lock-mask"
+          >
+            <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
         </article>
       </div>
     </section>
@@ -274,9 +326,55 @@ h1 {
   font-weight: 700;
 }
 
-.panel-header span {
-  color: var(--accent-color, #ff6b6b);
-  font-weight: 850;
+.my-posts-panel {
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.panel-link {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.empty-posts {
+  color: var(--color-text-light);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.my-posts-list {
+  display: grid;
+  gap: 10px;
+}
+
+.my-post-item {
+  padding: 12px;
+  border: 1px solid rgba(20, 20, 20, 0.06);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.my-post-content {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-post-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-light);
 }
 
 .progress-track {
@@ -301,16 +399,14 @@ h1 {
 }
 
 .achievement-card {
-  display: grid;
-  grid-template-columns: 12px 1fr auto;
-  align-items: center;
-  gap: 12px;
+  position: relative;
   min-height: 84px;
   padding: 14px;
   border: 1px solid rgba(20, 20, 20, 0.08);
   border-radius: 8px;
   background: rgba(250, 250, 250, 0.72);
   opacity: 0.58;
+  overflow: hidden;
 }
 
 .achievement-card.unlocked {
@@ -319,10 +415,39 @@ h1 {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
+.achievement-card.locked {
+  border-color: rgba(20, 20, 20, 0.15);
+}
+
+.achievement-card-inner {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.ach-lock-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.achievement-card .lock-icon {
+  width: 22px;
+  height: 22px;
+  color: #aaa;
+}
+
 .achievement-mark {
-  width: 12px;
-  height: 48px;
-  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(20, 20, 20, 0.08);
 }
 
 .achievement-card strong {
@@ -364,11 +489,11 @@ h1 {
     grid-template-columns: 1fr 1fr;
   }
 
-  .achievement-card {
-    grid-template-columns: 10px 1fr;
+  .achievement-card-inner {
+    grid-template-columns: 32px 1fr;
   }
 
-  .achievement-card small {
+  .achievement-card-inner small {
     grid-column: 2;
     justify-self: start;
   }

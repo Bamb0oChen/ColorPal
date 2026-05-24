@@ -17,9 +17,13 @@ const quickReplies = ref(['去拍照', '今日任务', '看看小彩状态'])
 const messages = ref<AgentMessage[]>([])
 const messageListRef = ref<HTMLElement | null>(null)
 
-const hasFallbackReply = computed(() => {
-  return messages.value.some((message) => message.source === 'fallback')
+const latestAssistantSource = computed(() => {
+  return [...messages.value]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.source)?.source
 })
+
+const hasFallbackReply = computed(() => latestAssistantSource.value === 'fallback')
 
 const visibleQuickReplies = computed(() => {
   const replies = ['去拍照', ...quickReplies.value.filter((reply) => reply !== '去拍照')]
@@ -65,7 +69,13 @@ const restoreMessages = () => {
 
   try {
     const parsed = JSON.parse(saved) as AgentMessage[]
-    messages.value = parsed.length ? parsed.slice(-MAX_MESSAGES) : [createWelcomeMessage()]
+    const restoredMessages = parsed.length ? parsed.slice(-MAX_MESSAGES) : []
+    // 旧兜底回复代表当时后端或模型不可用，恢复会误导用户以为当前仍离线。
+    messages.value = restoredMessages.some((message) => message.source === 'fallback')
+      ? [createWelcomeMessage()]
+      : restoredMessages.length
+        ? restoredMessages
+        : [createWelcomeMessage()]
   } catch {
     messages.value = [createWelcomeMessage()]
   }

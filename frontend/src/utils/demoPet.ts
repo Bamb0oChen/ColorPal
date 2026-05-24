@@ -14,5 +14,6 @@ export function createDemoPet(color = '#ff6b6b'): PetInfo {
       g: 21,
       b: 18,
     },
+    totalEnergy: 340,
   }
 }

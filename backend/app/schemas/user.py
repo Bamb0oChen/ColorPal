@@ -8,6 +8,7 @@ class PetInfo(BaseModel):
     stage: int = 0
     mood: str = "happy"
     color: str = "#CCCCCC"
+    totalEnergy: int = 0
     energy: dict = {"current": 50, "max": 300, "r": 20, "g": 15, "b": 15}
 
 

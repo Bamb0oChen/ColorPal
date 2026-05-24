@@ -13,4 +13,5 @@ export interface PetInfo {
   color: string
   totalEnergy: number
   energy: PetEnergy
+  totalEnergy: number
 }

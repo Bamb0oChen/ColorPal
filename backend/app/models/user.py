@@ -25,6 +25,7 @@ class User(Base):
     energy_r = Column(Integer, default=20)
     energy_g = Column(Integer, default=15)
     energy_b = Column(Integer, default=15)
+    total_energy = Column(Integer, default=0)
 
     # 统计
     total_photos = Column(Integer, default=0)

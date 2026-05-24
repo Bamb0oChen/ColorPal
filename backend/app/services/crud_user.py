@@ -28,6 +28,7 @@ def get_profile(db: Session, user_id: str = 'default') -> dict:
             'stage': user.pet_stage,
             'mood': user.pet_mood,
             'color': user.pet_color,
+            'totalEnergy': user.total_energy,
             'energy': {
                 'current': user.energy_current,
                 'max': user.energy_max,

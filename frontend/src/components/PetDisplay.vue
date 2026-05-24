@@ -6,6 +6,7 @@ import type {
   MotionPriority as MotionPriorityType,
 } from 'pixi-live2d-display/cubism2'
 import type { PetInfo } from '@/types/pet'
+import { getStageXPProgress, STAGE_XP_THRESHOLDS } from '@/utils/constants'
 import {
   cubism2RuntimeScript,
   defaultPetModel,
@@ -59,7 +60,8 @@ const accentColor = computed(() => props.pet.color || '#ff6b6b')
 const energyPercent = computed(() =>
   Math.min(Math.round((props.pet.energy.current / props.pet.energy.max) * 100), 100),
 )
-const stageLevel = computed(() => Math.min(Math.max(props.pet.stage + 1, 1), 4))
+const stageInfo = computed(() => getStageXPProgress(props.pet.totalEnergy ?? 0))
+const stageLevel = computed(() => stageInfo.value.stage + 1)
 const statusText = computed(() => {
   if (props.pet.mood === 'happy') return '今天吃得很开心'
   if (props.pet.mood === 'sad') return '想再尝一点颜色'
@@ -286,6 +288,16 @@ async function loadCubism2Runtime() {
         {{ channel.label }}
       </span>
     </div>
+
+    <div v-if="showStats" class="xp-bar">
+      <div class="xp-bar-header">
+        <span class="xp-label">Lv.{{ stageLevel }}</span>
+        <span class="xp-count">{{ stageInfo.currentXP }} / {{ stageInfo.nextStageXP }}</span>
+      </div>
+      <div class="xp-track">
+        <span :style="{ width: stageInfo.progressPercent + '%' }" />
+      </div>
+    </div>
   </section>
 </template>
 
@@ -308,7 +320,7 @@ async function loadCubism2Runtime() {
 }
 
 .pet-display.has-stats {
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
 }
 
 .pet-display.is-compact {
@@ -551,6 +563,44 @@ async function loadCubism2Runtime() {
   color: #252525;
   font-size: 12px;
   font-weight: 800;
+}
+
+.xp-bar {
+  width: min(100%, 292px);
+  display: grid;
+  gap: 6px;
+}
+
+.xp-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.xp-label {
+  font-size: 11px;
+  font-weight: 850;
+  color: var(--pet-accent);
+}
+
+.xp-count {
+  font-size: 11px;
+  color: var(--color-text-light, #999);
+}
+
+.xp-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(20, 20, 20, 0.08);
+}
+
+.xp-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--pet-accent), color-mix(in srgb, var(--pet-accent), #4ecdc4 40%));
+  transition: width 0.4s ease;
 }
 
 .mood-happy .aura {
