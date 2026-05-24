@@ -32,6 +32,7 @@ const showRouteDialog = ref(false)
 const showSearchResult = ref(false)
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
+const mapMode = ref<'explore' | 'route'>('explore')
 let locationMessageTimer: number | null = null
 
 function showTemporaryLocationMessage(message: string, autoHide = true) {
@@ -721,43 +722,58 @@ onMounted(async () => {
   <div class="map-page">
     <div id="map-container" class="map-container" />
 
-    <!-- 搜索框 -->
+    <!-- 搜索栏（含模式切换） -->
     <div class="search-bar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" class="search-icon">
-        <circle cx="11" cy="11" r="8" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-      </svg>
-      <input
-        ref="searchInputRef"
-        v-model="searchQuery"
-        class="search-input"
-        placeholder="输入颜色主题（红/蓝/金/绿）..."
-        enterkeyhint="search"
-        @keyup.enter="handleSearch"
-      />
-      <button
-        type="button"
-        class="search-submit"
-        :disabled="!searchQuery.trim()"
-        @click="handleSearch"
-      >
-        路线
-      </button>
-      <button
-        v-if="searchQuery"
-        type="button"
-        class="search-clear"
-        aria-label="清空路线"
-        title="清空路线"
-        @click="clearSearch"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
+      <div class="mode-switch">
+        <button
+          :class="['mode-btn', { active: mapMode === 'explore' }]"
+          @click="mapMode = 'explore'"
+        >
+          全局搜索
+        </button>
+        <button
+          :class="['mode-btn', { active: mapMode === 'route' }]"
+          @click="mapMode = 'route'"
+        >
+          路径规划
+        </button>
+      </div>
+      <div class="search-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" class="search-icon">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-      </button>
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          class="search-input"
+          :placeholder="mapMode === 'explore' ? '搜索地点...' : '输入颜色主题（红/蓝/金/绿）...'"
+          enterkeyhint="search"
+          @keyup.enter="handleSearch"
+        />
+        <button
+          type="button"
+          class="search-submit"
+          :disabled="!searchQuery.trim()"
+          @click="handleSearch"
+        >
+          {{ mapMode === 'route' ? '规划路线' : '搜索' }}
+        </button>
+        <button
+          v-if="searchQuery"
+          type="button"
+          class="search-clear"
+          aria-label="清空"
+          title="清空"
+          @click="clearSearch"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
     </div>
-
     <!-- 搜索结果面板 -->
     <div v-if="matchedRoute && showSearchResult" class="search-result-panel">
       <div class="result-header">
@@ -811,7 +827,7 @@ onMounted(async () => {
       @navigate="showRouteDialog = false"
     />
 
-    <div class="radius-selector">
+    <div v-if="mapMode === 'explore' && !showSearchResult" class="radius-selector">
       <button
         v-for="r in radiusOptions"
         :key="r"
@@ -822,7 +838,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div class="location-control">
+    <div v-if="mapMode === 'explore' && !showSearchResult" class="location-control">
       <div v-if="showLocationMessage" :class="['location-toast', `status-${locationStatus}`]">
         <div class="location-copy">
           <span class="location-dot" />
@@ -876,14 +892,53 @@ onMounted(async () => {
   transform: translateX(-50%);
   width: min(420px, calc(100% - 48px));
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  flex-direction: column;
+  gap: 0;
+  padding: 6px 6px 8px;
   background: var(--color-white);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   z-index: 1000;
   transition: box-shadow 0.15s ease;
+}
+
+.mode-switch {
+  display: flex;
+  gap: 3px;
+  padding: 0 2px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 6px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-light);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-btn.active {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.search-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  flex-wrap: nowrap;
+}
+
+.search-row .search-input {
+  min-width: 0;
 }
 
 .search-bar:focus-within {
@@ -942,7 +997,7 @@ onMounted(async () => {
 
 .radius-selector {
   position: absolute;
-  top: 72px;
+  top: 118px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -974,7 +1029,7 @@ onMounted(async () => {
 
 .location-control {
   position: absolute;
-  top: 124px;
+  top: 170px;
   left: 50%;
   transform: translateX(-50%);
   width: min(440px, calc(100% - 48px));
@@ -1167,7 +1222,7 @@ onMounted(async () => {
 /* ---- 搜索结果面板 ---- */
 .search-result-panel {
   position: absolute;
-  top: 76px;
+  top: 120px;
   left: 50%;
   transform: translateX(-50%);
   width: min(420px, calc(100% - 48px));
@@ -1313,7 +1368,7 @@ onMounted(async () => {
 
 @media (max-width: 760px) {
   .search-result-panel {
-    top: 70px;
+    top: 114px;
     max-height: calc(100vh - 160px);
   }
 }
