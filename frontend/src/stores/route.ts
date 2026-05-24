@@ -9,10 +9,10 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { parseRouteInput, type ColorRouteSuggestion } from '@/types/route'
+import { parseRouteInput, type ColorRouteSuggestionWithMeta } from '@/types/route'
 
 export const useRouteStore = defineStore('route', () => {
-  const suggestions = ref<ColorRouteSuggestion[]>([])
+  const suggestions = ref<ColorRouteSuggestionWithMeta[]>([])
   const activeIndex = ref(0)
   const isProcessing = ref(false)
 

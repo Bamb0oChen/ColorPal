@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, watch } from 'vue'
+import { ref, shallowRef, onMounted, watch, computed } from 'vue'
 import L from 'leaflet'
 import gcoord from 'gcoord'
 import RouteInputDialog from '@/components/RouteInputDialog.vue'
 import { useLocation } from '@/composables/useLocation'
 import { useRouteStore } from '@/stores/route'
 import type { Place } from '@/types/map'
-import type { ColorRoutePoint } from '@/types/route'
+import type { ColorRoutePoint, ColorRouteSuggestionWithMeta } from '@/types/route'
 
 const { getCurrentLocation } = useLocation()
 const routeStore = useRouteStore()
@@ -18,15 +18,31 @@ const routeMarkers = shallowRef<L.Layer[]>([])
 const currentLocation = ref<{ lat: number; lng: number }>({ lat: 0, lng: 0 })
 const isLocating = ref(true)
 const showBottomSheet = ref(false)
+
 const showRouteDialog = ref(false)
+
+const showSearchResult = ref(false)
+
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
+
+const matchedRoute = computed(() => {
+  const route = routeStore.suggestions[0]
+  if (!route) return null
+  return route as ColorRouteSuggestionWithMeta
+})
 
 function handleSearch() {
   const q = searchQuery.value.trim()
   if (!q) return
   routeStore.suggestRoute(q)
+  showSearchResult.value = true
   searchInputRef.value?.blur()
+}
+
+function closeSearchResult() {
+  showSearchResult.value = false
+  routeStore.clearRoute()
 }
 const radiusOptions = [500, 1000, 3000, 5000, 10000]
 const selectedRadius = ref(3000)
@@ -284,12 +300,59 @@ onMounted(async () => {
         placeholder="输入颜色主题（红/蓝/金/绿）..."
         @keyup.enter="handleSearch"
       />
-      <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''; routeStore.clearRoute()">
+      <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''; closeSearchResult()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
+    </div>
+
+    <!-- 搜索结果面板 -->
+    <div v-if="matchedRoute && showSearchResult" class="search-result-panel">
+      <div class="result-header">
+        <div class="result-badge" :style="{ backgroundColor: matchedRoute.themeColor }">
+          {{ matchedRoute.meta?.label ?? matchedRoute.title }}
+        </div>
+        <button class="result-close" @click="closeSearchResult">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <p class="result-hint">{{ matchedRoute.meta?.hint ?? matchedRoute.description }}</p>
+
+      <a
+        v-if="matchedRoute.meta?.sourceUrl"
+        :href="matchedRoute.meta.sourceUrl"
+        class="result-source"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+        <span>查看原视频</span>
+      </a>
+
+      <div class="result-points">
+        <div
+          v-for="pt in matchedRoute.points"
+          :key="pt.order"
+          class="point-card"
+        >
+          <span class="point-order" :style="{ backgroundColor: pt.color }">{{ pt.order }}</span>
+          <div class="point-swatch" :style="{ backgroundColor: pt.color }" />
+          <div class="point-info">
+            <strong>{{ pt.name }}</strong>
+            <span class="point-color-name">{{ pt.colorName }}</span>
+            <span class="point-desc">{{ pt.description }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <RouteInputDialog
@@ -531,6 +594,160 @@ onMounted(async () => {
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+/* ---- 搜索结果面板 ---- */
+.search-result-panel {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 48px));
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  z-index: 1000;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px);
+  animation: fadeDown 0.2s ease;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.result-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.result-close {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: #666;
+  cursor: pointer;
+}
+
+.result-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #555;
+}
+
+.result-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 5px 10px;
+  border: 1px solid rgba(20, 20, 20, 0.1);
+  border-radius: 6px;
+  color: var(--accent-color, #ff6b6b);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.result-source:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.result-points {
+  display: grid;
+  gap: 8px;
+}
+
+.point-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(20, 20, 20, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.point-order {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.point-swatch {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.point-info {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 8px;
+  min-width: 0;
+}
+
+.point-info strong {
+  font-size: 13px;
+  font-weight: 750;
+  color: #222;
+}
+
+.point-color-name {
+  justify-self: end;
+  font-size: 12px;
+  font-weight: 700;
+  color: #888;
+}
+
+.point-desc {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #999;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (max-width: 760px) {
+  .search-result-panel {
+    top: 70px;
+    max-height: calc(100vh - 160px);
+  }
 }
 
 @media (max-width: 760px) {
