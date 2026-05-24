@@ -20,6 +20,7 @@ export const useLocation = () => {
           const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
           }
           currentLocation.value = loc
           isLoading.value = false
@@ -29,6 +30,11 @@ export const useLocation = () => {
           error.value = err.message
           isLoading.value = false
           reject(err)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 30000,
         },
       )
     })
