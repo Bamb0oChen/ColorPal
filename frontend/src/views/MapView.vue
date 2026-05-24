@@ -5,11 +5,14 @@ import gcoord from 'gcoord'
 import RouteInputDialog from '@/components/RouteInputDialog.vue'
 import { useLocation } from '@/composables/useLocation'
 import { useRouteStore } from '@/stores/route'
-import type { Place } from '@/types/map'
-import type { ColorRoutePoint } from '@/types/route'
+import type { Location, Place } from '@/types/map'
+import { parseRouteInput, type ColorRoutePoint, type ColorRouteSuggestion } from '@/types/route'
 
 const { getCurrentLocation } = useLocation()
 const routeStore = useRouteStore()
+const AMAP_WEB_SERVICE_KEY = import.meta.env.VITE_AMAP_WEB_SERVICE_KEY?.trim() || ''
+const FALLBACK_LOCATION = { lat: 30.310270426774228, lng: 120.08862685063117 }
+let hasWarnedMissingAmapKey = false
 
 const selectedPlace = ref<Place | null>(null)
 const mapInstance = shallowRef<L.Map | null>(null)
@@ -22,11 +25,20 @@ const showRouteDialog = ref(false)
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
-function handleSearch() {
+async function handleSearch() {
   const q = searchQuery.value.trim()
   if (!q) return
-  routeStore.suggestRoute(q)
+  showBottomSheet.value = false
+  selectedPlace.value = null
+  await routeStore.suggestRoute(q, createRouteSuggestions)
   searchInputRef.value?.blur()
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  showBottomSheet.value = false
+  selectedPlace.value = null
+  routeStore.clearRoute()
 }
 const radiusOptions = [500, 1000, 3000, 5000, 10000]
 const selectedRadius = ref(3000)
@@ -37,8 +49,14 @@ const wgs84ToGcj02 = (lat: number, lng: number): [number, number] => {
   return [result[1], result[0]]
 }
 
+const gcj02ToWgs84 = (lat: number, lng: number): [number, number] => {
+  const result = gcoord.transform([lng, lat], gcoord.GCJ02, gcoord.WGS84)
+  return [result[1], result[0]]
+}
+
+const EARTH_RADIUS_METERS = 6371000
+
 const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371000
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLng = (lng2 - lng1) * Math.PI / 180
   const a =
@@ -46,7 +64,27 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLng / 2) * Math.sin(dLng / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
+  return EARTH_RADIUS_METERS * c
+}
+
+function offsetLocation(origin: Location, distance: number, bearing: number): Location {
+  const angularDistance = distance / EARTH_RADIUS_METERS
+  const bearingRad = bearing * Math.PI / 180
+  const latRad = origin.lat * Math.PI / 180
+  const lngRad = origin.lng * Math.PI / 180
+  const nextLat = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance) +
+    Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad),
+  )
+  const nextLng = lngRad + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+    Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(nextLat),
+  )
+
+  return {
+    lat: nextLat * 180 / Math.PI,
+    lng: nextLng * 180 / Math.PI,
+  }
 }
 
 const updateRadiusCircle = () => {
@@ -56,18 +94,64 @@ const updateRadiusCircle = () => {
   const [gcjLat, gcjLng] = wgs84ToGcj02(currentLocation.value.lat, currentLocation.value.lng)
   radiusCircle.value = L.circle([gcjLat, gcjLng], {
     radius: selectedRadius.value,
-    color: '#ff6b6b',
-    fillColor: '#ff6b6b',
-    fillOpacity: 0.08,
+    color: '#64748b',
+    fillColor: '#64748b',
+    fillOpacity: 0.05,
     weight: 2,
     dashArray: '5,5',
   }).addTo(mapInstance.value)
+  radiusCircle.value.bringToBack()
 }
 
-/** 根据景点描述映射颜色 */
-function mapColorByDescription(name: string, type: string): { hex: string; name: string } {
-  const kw = (name + type).toLowerCase()
-  if (kw.includes('公') || kw.includes('园') || kw.includes('林') || kw.includes('植') || kw.includes('绿')) {
+type PlaceColor = { hex: string; name: string }
+
+const FALLBACK_PLACE_COLORS: PlaceColor[] = [
+  { hex: '#50C878', name: '翠绿' },
+  { hex: '#30D5C8', name: '湖蓝' },
+  { hex: '#E1AD01', name: '芥末黄' },
+  { hex: '#87CEEB', name: '天蓝' },
+  { hex: '#FFBF00', name: '琥珀' },
+  { hex: '#E34234', name: '朱红' },
+  { hex: '#98FB98', name: '薄荷绿' },
+  { hex: '#0047AB', name: '钴蓝' },
+]
+
+function getStableColor(text: string): PlaceColor {
+  const sum = Array.from(text).reduce((total, char) => total + char.charCodeAt(0), 0)
+  return FALLBACK_PLACE_COLORS[sum % FALLBACK_PLACE_COLORS.length]
+}
+
+function sanitizeColorKeywordText(text: string) {
+  return text
+    .replace(/紫金港|紫荆|紫金|紫云|紫竹/g, '')
+    .toLowerCase()
+}
+
+/** 根据点位语义映射颜色，避免校区地名里的“紫”把所有点都染成紫色。 */
+function mapColorByDescription(name: string, type: string): PlaceColor {
+  const kw = sanitizeColorKeywordText(name + type)
+  if (kw.includes('紫藤') || kw.includes('紫罗兰') || kw.includes('紫色') || kw.includes('purple') || kw.includes('violet')) {
+    return { hex: '#8F00FF', name: '紫罗兰' }
+  }
+  if (kw.includes('餐饮') || kw.includes('咖啡') || kw.includes('饭') || kw.includes('面') || kw.includes('火锅') || kw.includes('烧烤') || kw.includes('小吃') || kw.includes('奶茶')) {
+    return { hex: '#FFBF00', name: '琥珀' }
+  }
+  if (kw.includes('购物') || kw.includes('商场') || kw.includes('超市') || kw.includes('便利') || kw.includes('天街')) {
+    return { hex: '#E34234', name: '朱红' }
+  }
+  if (kw.includes('学校') || kw.includes('学院') || kw.includes('大学') || kw.includes('教育') || kw.includes('图书')) {
+    return { hex: '#0047AB', name: '钴蓝' }
+  }
+  if (kw.includes('酒店') || kw.includes('住宿') || kw.includes('公寓')) {
+    return { hex: '#FFFDD0', name: '米黄' }
+  }
+  if (kw.includes('美容') || kw.includes('美甲') || kw.includes('spa') || kw.includes('生活服务')) {
+    return { hex: '#98FB98', name: '薄荷绿' }
+  }
+  if (kw.includes('公司') || kw.includes('写字楼') || kw.includes('园区')) {
+    return { hex: '#87CEEB', name: '天蓝' }
+  }
+  if (kw.includes('公园') || kw.includes('园林') || kw.includes('森林') || kw.includes('树林') || kw.includes('植') || kw.includes('绿') || kw.includes('湿地') || kw.includes('草')) {
     return { hex: '#7CFC00', name: '草绿' }
   }
   if (kw.includes('湖') || kw.includes('海') || kw.includes('水') || kw.includes('河') || kw.includes('江')) {
@@ -85,61 +169,343 @@ function mapColorByDescription(name: string, type: string): { hex: string; name:
   if (kw.includes('山') || kw.includes('峰') || kw.includes('岭') || kw.includes('石')) {
     return { hex: '#808000', name: '橄榄绿' }
   }
-  if (kw.includes('天') || kw.includes('空') || kw.includes('广') || kw.includes('场')) {
+  if (kw.includes('天空') || kw.includes('广场')) {
     return { hex: '#87CEEB', name: '天蓝' }
   }
-  return { hex: '#A29BFE', name: '淡紫' }
+  return getStableColor(name + type)
 }
 
-const searchNearbyScenicSpots = async (): Promise<Place[]> => {
-  const { lat, lng } = currentLocation.value
-  const radius = selectedRadius.value
+type NearbySearchOptions = {
+  query?: string
+  radius?: number
+  pageLimit?: number
+  center?: Location
+  maxDistanceFromCurrent?: number
+}
+
+const COLOR_INTENTS = [
+  { terms: ['红', 'red', '热烈'], hex: '#CC0000', name: '正红', label: '红色' },
+  { terms: ['蓝', 'blue', '清新'], hex: '#0047AB', name: '钴蓝', label: '蓝色' },
+  { terms: ['黄', '金', 'yellow', '温暖'], hex: '#FFD700', name: '金黄', label: '金色' },
+  { terms: ['绿', 'green', '自然'], hex: '#50C878', name: '翠绿', label: '绿色' },
+]
+
+function getColorIntent(query: string): { hex: string; name: string; label: string } | null {
+  const kw = query.toLowerCase()
+  return COLOR_INTENTS.find((intent) => intent.terms.some((term) => kw.includes(term))) ?? null
+}
+
+function getAmapKeyword(query = '') {
+  const trimmed = query.trim()
+  return trimmed && !getColorIntent(trimmed) ? trimmed : ''
+}
+
+function getPageLimitForRadius(radius: number) {
+  if (radius <= 1000) return 2
+  if (radius <= 3000) return 4
+  if (radius <= 5000) return 8
+  return 12
+}
+
+function formatDistance(distance: number) {
+  return distance >= 1000 ? `${(distance / 1000).toFixed(1)}km` : `${Math.round(distance)}m`
+}
+
+function formatRadius(radius: number) {
+  return radius >= 1000 ? `${radius / 1000}km` : `${radius}m`
+}
+
+function isFarEnoughFromPicked(place: Place, picked: Place[], minDistance: number) {
+  return picked.every((candidate) => (
+    calculateDistance(
+      place.location.lat,
+      place.location.lng,
+      candidate.location.lat,
+      candidate.location.lng,
+    ) >= minDistance
+  ))
+}
+
+function selectDistributedPlaces(places: Place[], radius: number, limit: number) {
+  const sorted = [...places].sort((a, b) => a.distance - b.distance)
+  if (sorted.length <= limit) return sorted.slice(0, limit)
+
+  const bands = [
+    [radius * 0.68, radius + 1],
+    [radius * 0.34, radius * 0.68],
+    [0, radius * 0.34],
+  ] as const
+  const picked: Place[] = []
+  const usedIds = new Set<string>()
+  const perBand = Math.max(1, Math.ceil(limit / bands.length))
+  const minDistance = Math.min(1400, Math.max(450, radius / 7))
+
+  const tryPick = (candidates: Place[], quota: number, minSpacing: number) => {
+    let pickedInBatch = 0
+    candidates.some((place) => {
+      if (picked.length >= limit || pickedInBatch >= quota) return true
+      if (usedIds.has(place.id)) return false
+      if (minSpacing > 0 && !isFarEnoughFromPicked(place, picked, minSpacing)) return false
+      picked.push(place)
+      usedIds.add(place.id)
+      pickedInBatch += 1
+      return false
+    })
+  }
+
+  bands.forEach(([min, max]) => {
+    const candidates = sorted.filter((place) => place.distance >= min && place.distance < max)
+    tryPick(candidates, perBand, minDistance)
+  })
+
+  tryPick(sorted, limit - picked.length, minDistance)
+  tryPick(sorted, limit - picked.length, Math.min(500, Math.max(180, radius / 30)))
+  tryPick(sorted, limit - picked.length, 0)
+
+  return picked
+    .slice(0, limit)
+    .sort((a, b) => a.distance - b.distance)
+}
+
+function calculateRouteDistance<T extends { location: Location }>(items: T[], origin: Location) {
+  return items.reduce((total, item, index) => {
+    const previous = index === 0 ? origin : items[index - 1].location
+    return total + calculateDistance(
+      previous.lat,
+      previous.lng,
+      item.location.lat,
+      item.location.lng,
+    )
+  }, 0)
+}
+
+/** 点数很少时直接枚举，保证颜色路线的访问顺序尽量短。 */
+function orderItemsByShortestPath<T extends { location: Location }>(items: T[], origin: Location) {
+  if (items.length <= 2) return items
+
+  let bestRoute = [...items]
+  let bestDistance = calculateRouteDistance(bestRoute, origin)
+  const used = new Set<number>()
+  const currentRoute: T[] = []
+
+  const search = () => {
+    if (currentRoute.length === items.length) {
+      const distance = calculateRouteDistance(currentRoute, origin)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        bestRoute = [...currentRoute]
+      }
+      return
+    }
+
+    items.forEach((item, index) => {
+      if (used.has(index)) return
+      used.add(index)
+      currentRoute.push(item)
+      search()
+      currentRoute.pop()
+      used.delete(index)
+    })
+  }
+
+  search()
+  return bestRoute
+}
+
+function createShortestFallbackSuggestions(input: string) {
+  return parseRouteInput(input).map((suggestion) => {
+    const points = orderItemsByShortestPath(suggestion.points, currentLocation.value)
+      .map((point, index) => ({ ...point, order: index + 1 }))
+    const distance = calculateRouteDistance(points, currentLocation.value)
+    return {
+      ...suggestion,
+      description: `${suggestion.description} · 已按最短访问顺序排序，约 ${formatDistance(distance)}`,
+      points,
+    }
+  })
+}
+
+const searchNearbyPlaces = async (options: NearbySearchOptions = {}): Promise<Place[]> => {
+  const origin = currentLocation.value
+  const searchCenter = options.center ?? origin
+  const radius = options.radius ?? selectedRadius.value
+  const maxDistanceFromCurrent = options.maxDistanceFromCurrent ?? radius
   const allSpots: Place[] = []
-  const maxPage = 2
-  const offset = 50
+  const seenIds = new Set<string>()
+  const maxPage = options.pageLimit ?? getPageLimitForRadius(radius)
+  const offset = 25
+  const keyword = getAmapKeyword(options.query)
+  const [gcjLat, gcjLng] = wgs84ToGcj02(searchCenter.lat, searchCenter.lng)
+
+  if (!AMAP_WEB_SERVICE_KEY) {
+    if (!hasWarnedMissingAmapKey) {
+      console.warn('[MapView] 未配置 VITE_AMAP_WEB_SERVICE_KEY，使用本地路线兜底。')
+      hasWarnedMissingAmapKey = true
+    }
+    return allSpots
+  }
 
   try {
     for (let page = 1; page <= maxPage; page++) {
-      const url = `https://restapi.amap.com/v3/place/around?key=ac61b3beda328566f7b6215a617629b6&location=${lng},${lat}&radius=${radius}&types=110000&offset=${offset}&page=${page}&extensions=all`
+      const params = new URLSearchParams({
+        key: AMAP_WEB_SERVICE_KEY,
+        location: `${gcjLng},${gcjLat}`,
+        radius: String(radius),
+        offset: String(offset),
+        page: String(page),
+        extensions: 'all',
+      })
+
+      if (keyword) {
+        params.set('keywords', keyword)
+      } else {
+        params.set('types', '050000|080000|110000|140000')
+      }
+
+      const url = `https://restapi.amap.com/v3/place/around?${params.toString()}`
       const response = await fetch(url)
       const data = await response.json()
 
       if (data.status !== '1' || !data.pois || data.pois.length === 0) break
 
       const spots = data.pois
+        .filter((poi: any) => typeof poi.location === 'string' && poi.location.includes(','))
         .map((poi: any): Place => {
           const [poiLng, poiLat] = poi.location.split(',').map(Number)
+          const [wgsLat, wgsLng] = gcj02ToWgs84(poiLat, poiLng)
           const rating = poi.biz_ext?.rating ? parseFloat(poi.biz_ext.rating) : 0
+          const id = poi.id || `${poi.name}-${poi.location}`
           return {
-            id: poi.id,
+            id,
             name: poi.name,
             address: poi.address || '',
-            location: { lat: poiLat, lng: poiLng },
+            location: { lat: wgsLat, lng: wgsLng },
             category: 'scenic',
             rating,
             description: poi.type || '',
             image: '',
-            distance: calculateDistance(lat, lng, poiLat, poiLng),
+            distance: calculateDistance(origin.lat, origin.lng, wgsLat, wgsLng),
           }
         })
-        .filter((p: Place) => p.rating > 4.3)
+        .filter((place: Place) => (
+          place.distance <= maxDistanceFromCurrent + 80 && !seenIds.has(place.id)
+        ))
 
-      allSpots.push(...spots)
+      spots.forEach((place: Place) => {
+        allSpots.push(place)
+        seenIds.add(place.id)
+      })
       if (data.pois.length < offset) break
     }
-    return allSpots
+    return allSpots.sort((a, b) => a.distance - b.distance)
   } catch {
     return allSpots
   }
 }
 
-const refreshMarkers = async () => {
-  if (!mapInstance.value) return
+function mergeUniquePlaces(groups: Place[][]) {
+  const seenIds = new Set<string>()
+  const merged: Place[] = []
 
+  groups.flat().forEach((place) => {
+    const key = place.id || `${place.name}-${place.location.lat.toFixed(5)}-${place.location.lng.toFixed(5)}`
+    if (seenIds.has(key)) return
+    const isSameSpot = merged.some((existing) => (
+      calculateDistance(
+        existing.location.lat,
+        existing.location.lng,
+        place.location.lat,
+        place.location.lng,
+      ) < 120
+    ))
+    if (isSameSpot) return
+    seenIds.add(key)
+    merged.push(place)
+  })
+
+  return merged.sort((a, b) => a.distance - b.distance)
+}
+
+async function searchPlacesAcrossRadius(options: NearbySearchOptions = {}): Promise<Place[]> {
+  const radius = options.radius ?? selectedRadius.value
+  if (options.center || radius <= 3000) {
+    return searchNearbyPlaces(options)
+  }
+
+  const probeDistance = radius * 0.62
+  const probeRadius = Math.min(2400, Math.max(900, radius * 0.3))
+  const probePageLimit = radius >= 10000 ? 2 : 1
+  const bearings = [0, 60, 120, 180, 240, 300]
+  const probeSearches = bearings.map((bearing) => (
+    searchNearbyPlaces({
+      ...options,
+      center: offsetLocation(currentLocation.value, probeDistance, bearing),
+      radius: probeRadius,
+      pageLimit: probePageLimit,
+      maxDistanceFromCurrent: radius,
+    })
+  ))
+
+  const groups = await Promise.all([
+    searchNearbyPlaces({ ...options, maxDistanceFromCurrent: radius }),
+    ...probeSearches,
+  ])
+
+  return mergeUniquePlaces(groups)
+}
+
+const searchNearbyScenicSpots = async (): Promise<Place[]> => {
+  const spots = await searchPlacesAcrossRadius()
+  return selectDistributedPlaces(spots, selectedRadius.value, 64)
+}
+
+async function createRouteSuggestions(input: string): Promise<ColorRouteSuggestion[]> {
+  const radius = selectedRadius.value
+  const places = await searchPlacesAcrossRadius({
+    query: input,
+    radius,
+    pageLimit: getPageLimitForRadius(radius) + 2,
+  })
+  const routePlaces = orderItemsByShortestPath(
+    selectDistributedPlaces(places, radius, 5),
+    currentLocation.value,
+  )
+  if (routePlaces.length === 0) return createShortestFallbackSuggestions(input)
+
+  const intent = getColorIntent(input)
+  const firstColor = intent ?? mapColorByDescription(routePlaces[0].name, routePlaces[0].description)
+  const routeDistance = calculateRouteDistance(routePlaces, currentLocation.value)
+  const points = routePlaces.map((place, index): ColorRoutePoint => {
+    const colorInfo = intent ?? mapColorByDescription(place.name, place.description)
+    return {
+      name: place.name,
+      location: place.location,
+      color: colorInfo.hex,
+      colorName: colorInfo.name,
+      description: `${place.address || place.description || '附近点位'} · ${formatDistance(place.distance)}`,
+      order: index + 1,
+    }
+  })
+
+  return [{
+    title: `${intent?.label ?? input} · 附近色彩路线`,
+    description: `基于当前位置 ${formatRadius(radius)} 内的真实点位生成，已按最短访问顺序排序，约 ${formatDistance(routeDistance)}`,
+    themeColor: firstColor.hex,
+    points,
+  }]
+}
+
+function clearPlaceMarkers() {
   markers.value.forEach((m) => {
     mapInstance.value?.removeLayer(m)
   })
   markers.value = []
+}
+
+const refreshMarkers = async () => {
+  if (!mapInstance.value) return
+  clearPlaceMarkers()
+  if (routeStore.hasActiveRoute) return
 
   const spots = await searchNearbyScenicSpots()
   spots.forEach((place) => {
@@ -186,10 +552,20 @@ const addCurrentLocationMarker = () => {
   L.marker([gcjLat, gcjLng], { icon }).addTo(mapInstance.value).bindPopup('我的位置')
 }
 
-const handleRadiusChange = (radius: number) => {
+function fitToRadius() {
+  if (!mapInstance.value || !radiusCircle.value) return
+  mapInstance.value.fitBounds(radiusCircle.value.getBounds(), { padding: [40, 40] })
+}
+
+const handleRadiusChange = async (radius: number) => {
   selectedRadius.value = radius
   updateRadiusCircle()
-  refreshMarkers()
+  fitToRadius()
+  if (routeStore.hasActiveRoute && searchQuery.value.trim()) {
+    await handleSearch()
+  } else {
+    await refreshMarkers()
+  }
 }
 
 /** 在地图上渲染颜色路线点位 */
@@ -198,7 +574,14 @@ function renderRoutePoints(points: ColorRoutePoint[]) {
     mapInstance.value?.removeLayer(m)
   })
   routeMarkers.value = []
-  if (!mapInstance.value || points.length === 0) return
+  if (!mapInstance.value) return
+  if (points.length === 0) {
+    void refreshMarkers()
+    return
+  }
+  clearPlaceMarkers()
+  showBottomSheet.value = false
+  selectedPlace.value = null
 
   const latlngs: [number, number][] = []
   points.forEach((pt) => {
@@ -219,7 +602,19 @@ function renderRoutePoints(points: ColorRoutePoint[]) {
 
   // 画连线
   if (latlngs.length > 1) {
-    L.polyline(latlngs, { color: '#ff6b6b', weight: 3, opacity: 0.6, dashArray: '8,8' }).addTo(mapInstance.value!)
+    const routeColor = points[0]?.color || '#ff6b6b'
+    const halo = L.polyline(
+      latlngs,
+      { color: '#ffffff', weight: 8, opacity: 0.85 },
+    ).addTo(mapInstance.value!)
+    const line = L.polyline(
+      latlngs,
+      { color: routeColor, weight: 4, opacity: 0.95, dashArray: '10,8' },
+    ).addTo(mapInstance.value!)
+    halo.bringToFront()
+    line.bringToFront()
+    routeMarkers.value.push(halo)
+    routeMarkers.value.push(line)
   }
 
   // 缩放到路线范围
@@ -240,7 +635,11 @@ const handleLocate = async () => {
     mapInstance.value?.setView([gcjLat, gcjLng], 15)
     addCurrentLocationMarker()
     updateRadiusCircle()
-    refreshMarkers()
+    if (routeStore.hasActiveRoute && searchQuery.value.trim()) {
+      handleSearch()
+    } else {
+      refreshMarkers()
+    }
   } catch { /* ignore */ }
 }
 
@@ -255,7 +654,7 @@ onMounted(async () => {
     addCurrentLocationMarker()
     setTimeout(() => refreshMarkers(), 500)
   } catch {
-    currentLocation.value = { lat: 39.9042, lng: 116.4074 }
+    currentLocation.value = FALLBACK_LOCATION
     const [gcjLat, gcjLng] = wgs84ToGcj02(currentLocation.value.lat, currentLocation.value.lng)
     mapInstance.value?.setView([gcjLat, gcjLng], 15)
     updateRadiusCircle()
@@ -282,9 +681,25 @@ onMounted(async () => {
         v-model="searchQuery"
         class="search-input"
         placeholder="输入颜色主题（红/蓝/金/绿）..."
+        enterkeyhint="search"
         @keyup.enter="handleSearch"
       />
-      <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''; routeStore.clearRoute()">
+      <button
+        type="button"
+        class="search-submit"
+        :disabled="!searchQuery.trim()"
+        @click="handleSearch"
+      >
+        路线
+      </button>
+      <button
+        v-if="searchQuery"
+        type="button"
+        class="search-clear"
+        aria-label="清空路线"
+        title="清空路线"
+        @click="clearSearch"
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
@@ -391,6 +806,23 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.search-submit {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.search-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .radius-selector {

@@ -1,9 +1,9 @@
 /**
  * 颜色旅行路径系统类型定义
  *
- * 接口说明（供明日硬编码对接用）：
+ * 接口说明（供离线 demo 兜底用）：
  *   parseRouteInput(input)  → ColorRouteSuggestion[]
- *   输入抖音链接或文字，返回一组颜色路线建议
+ *   输入抖音链接或文字，在联网规划失败时返回一组本地路线建议
  */
 
 /** 路径上的一个颜色点位 */
@@ -41,19 +41,14 @@ export type RouteInputSource = 'douyin' | 'text'
 export interface RouteParseResult {
   source: RouteInputSource
   rawInput: string
-  /** 交给明日硬编码映射：返回 ColorRouteSuggestion[] */
+  /** 联网规划失败时的备用建议路线 */
   suggestions: ColorRouteSuggestion[]
 }
-
-// ============================================================
-// 明日对接接口：替换此函数的实现即可
-// ============================================================
 
 /**
  * 解析用户输入，返回颜色路线建议
  *
- * 演示数据：按关键词返回预设路线。
- * 明日替换为端对端硬编码映射（抖音链接 → 颜色点位）。
+ * 备用数据：按关键词返回紫金港周边预设路线。
  */
 export function parseRouteInput(input: string): ColorRouteSuggestion[] {
   const kw = input.toLowerCase()
@@ -61,14 +56,14 @@ export function parseRouteInput(input: string): ColorRouteSuggestion[] {
   // 红色系路线
   if (kw.includes('红') || kw.includes('red') || kw.includes('热烈')) {
     return [{
-      title: '红色·京城中轴线',
-      description: '从故宫到前门，一路中国红',
+      title: '红色·紫金印象',
+      description: '从西溪到紫金港，寻一抹红色',
       themeColor: '#FF0000',
       points: [
-        { name: '故宫午门', location: { lat: 39.9147, lng: 116.3956 }, color: '#CC0000', colorName: '正红', description: '故宫的正红城墙', order: 1 },
-        { name: '天安门', location: { lat: 39.9054, lng: 116.3976 }, color: '#E34234', colorName: '朱红', description: '天安门城楼', order: 2 },
-        { name: '前门大街', location: { lat: 39.8950, lng: 116.3960 }, color: '#CB4154', colorName: '砖红', description: '前门的砖红色建筑', order: 3 },
-        { name: '永定门', location: { lat: 39.8708, lng: 116.3942 }, color: '#800020', colorName: '酒红', description: '永定门城楼', order: 4 },
+        { name: '紫金港·南大门', location: { lat: 30.3005, lng: 120.0850 }, color: '#CC0000', colorName: '正红', description: '南大门的红色拱门', order: 1 },
+        { name: '西溪·梅林', location: { lat: 30.2720, lng: 120.0580 }, color: '#E34234', colorName: '朱红', description: '冬日盛开的红色梅花', order: 2 },
+        { name: '西溪天堂·湿地博物馆', location: { lat: 30.2690, lng: 120.0650 }, color: '#CB4154', colorName: '砖红', description: '博物馆的红砖外墙', order: 3 },
+        { name: '三墩老街·夕照', location: { lat: 30.3180, lng: 120.0680 }, color: '#800020', colorName: '酒红', description: '老街黄昏的酒红色余晖', order: 4 },
       ],
     }]
   }
@@ -76,14 +71,14 @@ export function parseRouteInput(input: string): ColorRouteSuggestion[] {
   // 蓝色系路线
   if (kw.includes('蓝') || kw.includes('blue') || kw.includes('清新')) {
     return [{
-      title: '蓝色·水畔漫步',
-      description: '沿着北京的水系寻找蓝色',
+      title: '蓝色·启真水色',
+      description: '紫金港周边的蓝色水系',
       themeColor: '#4B9FE3',
       points: [
-        { name: '北海公园', location: { lat: 39.9243, lng: 116.3893 }, color: '#87CEEB', colorName: '天蓝', description: '北海的白塔与蓝天', order: 1 },
-        { name: '后海', location: { lat: 39.9400, lng: 116.3840 }, color: '#30D5C8', colorName: '湖蓝', description: '后海的湖面', order: 2 },
-        { name: '颐和园昆明湖', location: { lat: 39.9998, lng: 116.2755 }, color: '#4B0082', colorName: '靛蓝', description: '昆明湖的靛蓝倒影', order: 3 },
-        { name: '国家大剧院', location: { lat: 39.9030, lng: 116.3833 }, color: '#0047AB', colorName: '钴蓝', description: '大剧院的蓝色玻璃幕墙', order: 4 },
+        { name: '紫金港·启真湖', location: { lat: 30.3042, lng: 120.0826 }, color: '#87CEEB', colorName: '天蓝', description: '启真湖倒映的蓝天', order: 1 },
+        { name: '西溪·湿地湖泊', location: { lat: 30.2705, lng: 120.0590 }, color: '#30D5C8', colorName: '湖蓝', description: '湿地湖面的清透蓝色', order: 2 },
+        { name: '余杭塘河', location: { lat: 30.3090, lng: 120.0790 }, color: '#4B0082', colorName: '靛蓝', description: '河水的靛蓝色调', order: 3 },
+        { name: '紫金港·蓝桥', location: { lat: 30.3055, lng: 120.0835 }, color: '#0047AB', colorName: '钴蓝', description: '校园蓝桥的钴蓝栏杆', order: 4 },
       ],
     }]
   }
@@ -91,14 +86,14 @@ export function parseRouteInput(input: string): ColorRouteSuggestion[] {
   // 黄色/金色系路线
   if (kw.includes('黄') || kw.includes('金') || kw.includes('yellow') || kw.includes('温暖')) {
     return [{
-      title: '金色·夕阳古都',
-      description: '日落时分，北京的金色时刻',
+      title: '金色·西溪秋韵',
+      description: '紫金港周边的金色光影',
       themeColor: '#FFD700',
       points: [
-        { name: '景山万春亭', location: { lat: 39.9225, lng: 116.3966 }, color: '#FFD700', colorName: '金黄', description: '俯瞰故宫全景', order: 1 },
-        { name: '天坛祈年殿', location: { lat: 39.8822, lng: 116.4066 }, color: '#E1AD01', colorName: '芥末黄', description: '祈年殿的金色宝顶', order: 2 },
-        { name: '鼓楼', location: { lat: 39.9397, lng: 116.4040 }, color: '#FFFDD0', colorName: '米黄', description: '鼓楼的暖黄灯光', order: 3 },
-        { name: '国贸CBD', location: { lat: 39.9087, lng: 116.4605 }, color: '#FFBF00', colorName: '琥珀', description: '国贸的落日余晖', order: 4 },
+        { name: '紫金港·银杏大道', location: { lat: 30.3030, lng: 120.0840 }, color: '#FFD700', colorName: '金黄', description: '深秋金黄的银杏大道', order: 1 },
+        { name: '西溪·芦苇荡', location: { lat: 30.2710, lng: 120.0610 }, color: '#E1AD01', colorName: '芥末黄', description: '夕阳下的金色芦苇', order: 2 },
+        { name: '余杭塘河·晚霞', location: { lat: 30.3080, lng: 120.0760 }, color: '#FFBF00', colorName: '琥珀', description: '河面倒映的琥珀色晚霞', order: 3 },
+        { name: '龙湖·紫荆天街', location: { lat: 30.3130, lng: 120.0710 }, color: '#FFFDD0', colorName: '米黄', description: '天街的暖黄灯光夜景', order: 4 },
       ],
     }]
   }
@@ -106,29 +101,29 @@ export function parseRouteInput(input: string): ColorRouteSuggestion[] {
   // 绿色系路线
   if (kw.includes('绿') || kw.includes('green') || kw.includes('自然')) {
     return [{
-      title: '绿色·城市绿洲',
-      description: '北京的绿色角落与公园',
+      title: '绿色·紫金漫步',
+      description: '浙大紫金港周边的绿色角落',
       themeColor: '#7CFC00',
       points: [
-        { name: '奥森公园', location: { lat: 40.0150, lng: 116.3900 }, color: '#7CFC00', colorName: '草绿', description: '奥林匹克森林公园', order: 1 },
-        { name: '中山公园', location: { lat: 39.9086, lng: 116.3972 }, color: '#50C878', colorName: '翠绿', description: '古树参天', order: 2 },
-        { name: '颐和园', location: { lat: 40.0010, lng: 116.2770 }, color: '#808000', colorName: '橄榄绿', description: '万寿山的绿荫', order: 3 },
-        { name: '紫竹院公园', location: { lat: 39.9420, lng: 116.3160 }, color: '#98FB98', colorName: '薄荷绿', description: '竹林小径', order: 4 },
+        { name: '紫金港·启真湖', location: { lat: 30.3042, lng: 120.0826 }, color: '#7CFC00', colorName: '草绿', description: '启真湖畔的大草坪', order: 1 },
+        { name: '西溪湿地·绿堤', location: { lat: 30.2700, lng: 120.0600 }, color: '#50C878', colorName: '翠绿', description: '湿地的翠绿水生植物', order: 2 },
+        { name: '老和山', location: { lat: 30.2670, lng: 120.1290 }, color: '#808000', colorName: '橄榄绿', description: '山间的绿荫步道', order: 3 },
+        { name: '余杭塘河绿道', location: { lat: 30.3090, lng: 120.0790 }, color: '#98FB98', colorName: '薄荷绿', description: '河畔的清新绿道', order: 4 },
       ],
     }]
   }
 
   // 默认 - 彩色路线
   return [{
-    title: '彩色·北京色谱',
-    description: '从红到紫，收集北京的颜色',
+    title: '彩色·紫金港色谱',
+    description: '从湖水、绿道到晚霞，收集紫金港周边的颜色',
     themeColor: '#FF6B6B',
     points: [
-      { name: '故宫', location: { lat: 39.9147, lng: 116.3956 }, color: '#CC0000', colorName: '正红', description: '故宫红墙', order: 1 },
-      { name: '天坛', location: { lat: 39.8822, lng: 116.4066 }, color: '#0047AB', colorName: '钴蓝', description: '天坛蓝瓦', order: 2 },
-      { name: '北海公园', location: { lat: 39.9243, lng: 116.3893 }, color: '#7CFC00', colorName: '草绿', description: '北海绿柳', order: 3 },
-      { name: '鼓楼', location: { lat: 39.9397, lng: 116.4040 }, color: '#FFD700', colorName: '金黄', description: '鼓楼夕照', order: 4 },
-      { name: '颐和园', location: { lat: 39.9998, lng: 116.2755 }, color: '#8F00FF', colorName: '紫罗兰', description: '颐和园紫霞', order: 5 },
+      { name: '紫金港·南大门', location: { lat: 30.3005, lng: 120.0850 }, color: '#CC0000', colorName: '正红', description: '南大门的红色拱门', order: 1 },
+      { name: '紫金港·启真湖', location: { lat: 30.3042, lng: 120.0826 }, color: '#87CEEB', colorName: '天蓝', description: '启真湖倒映的蓝天', order: 2 },
+      { name: '余杭塘河绿道', location: { lat: 30.3090, lng: 120.0790 }, color: '#98FB98', colorName: '薄荷绿', description: '河畔的清新绿道', order: 3 },
+      { name: '余杭塘河·晚霞', location: { lat: 30.3080, lng: 120.0760 }, color: '#FFBF00', colorName: '琥珀', description: '河面倒映的琥珀色晚霞', order: 4 },
+      { name: '西溪天堂·湿地博物馆', location: { lat: 30.2690, lng: 120.0650 }, color: '#CB4154', colorName: '砖红', description: '博物馆的红砖外墙', order: 5 },
     ],
   }]
 }
