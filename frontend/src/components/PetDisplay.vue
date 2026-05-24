@@ -164,9 +164,9 @@ function fitModel() {
   const scale =
     Math.min((width * 0.84) / model.value.width, (height * 0.86) / model.value.height) *
     scaleMultiplier
-  model.value.scale.set(scale, scale * 2.05)
+  model.value.scale.set(scale)
   model.value.x = width / 2
-  model.value.y = height * (props.showStats ? 0.84 : 1.08)
+  model.value.y = height * (props.showStats ? 0.93 : 1.08)
 }
 
 async function playEventMotion(event: PetDisplayEvent) {
@@ -406,6 +406,8 @@ async function loadCubism2Runtime() {
   width: 100%;
   height: 100%;
   display: block;
+  transform: scaleY(1.30);
+  transform-origin: 50% 0%;
 }
 
 .fallback-shell {
